@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<animated-vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:drawable="@drawable/ic_splash">
+
+    <!-- Animate different parts of the logo with staggered timing -->
+    <target
+        android:name="leftPart"
+        android:animation="@animator/animator_splash_left"/>
+
+    <target
+        android:name="centerPart"
+        android:animation="@animator/animator_splash_center"/>
+
+    <target
+        android:name="rightPart"
+        android:animation="@animator/animator_splash_right"/>
+
+    <target
+        android:name="bottomPart"
+        android:animation="@animator/animator_splash_bottom"/>
+</animated-vector>
