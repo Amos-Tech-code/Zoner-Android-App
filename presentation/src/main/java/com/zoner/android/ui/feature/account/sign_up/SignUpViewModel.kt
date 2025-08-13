@@ -36,13 +36,19 @@ class SignUpViewModel : BaseAuthViewModel() {
     fun onPhoneNumberUpdated(value: String) {
         _formState.update { it.copy(phoneNumber = value) }
     }
+    fun onPasswordUpdated(value: String) {
+        _formState.update { it.copy(password = value) }
+    }
+    fun onCPasswordUpdated(value: String) {
+        _formState.update { it.copy(confirmPassword = value) }
+    }
 
     fun register() {
         viewModelScope.launch {
             _state.value = SignUpState.Loading
             delay(3000)
             _state.value = SignUpState.Success
-            _event.send(SignUpEvent.NavigateToSignIn)
+            _event.send(SignUpEvent.NavigateToVerification)
         }
     }
 
@@ -55,7 +61,9 @@ class SignUpViewModel : BaseAuthViewModel() {
     data class SignUpFormState(
         val fullName: String = "",
         val email: String = "",
-        val phoneNumber: String = ""
+        val phoneNumber: String = "",
+        val password: String = "",
+        val confirmPassword: String = ""
     )
 
     override fun loading() {

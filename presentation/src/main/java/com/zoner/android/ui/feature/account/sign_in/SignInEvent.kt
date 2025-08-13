@@ -6,7 +6,7 @@ sealed class SignInEvent {
 
     data object NavigateToSignUp : SignInEvent()
 
-    data object NavigateToCountrySelection : SignInEvent()
+    data object NavigateToResetPassword : SignInEvent()
 
-    data object NavigateToOTPVerification : SignInEvent()
+    data object NavigateToHome : SignInEvent()
 }

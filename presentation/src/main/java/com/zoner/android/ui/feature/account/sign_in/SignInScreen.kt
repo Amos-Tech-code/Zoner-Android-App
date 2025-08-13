@@ -21,6 +21,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -28,7 +31,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -37,24 +39,24 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import androidx.window.core.layout.WindowSizeClass
 import com.zoner.android.R
-import com.zoner.android.navigation.CountrySelectRoute
-import com.zoner.android.navigation.OTPVerificationRoute
-import com.zoner.android.navigation.SignUpRoute
-import com.zoner.android.ui.designSystem.ZonerSelectorTextField
+import com.zoner.android.ui.navigation.MainAppRoute
+import com.zoner.android.ui.navigation.OTPVerificationRoute
+import com.zoner.android.ui.navigation.ResetPasswordRoute
+import com.zoner.android.ui.navigation.SignInRoute
+import com.zoner.android.ui.navigation.SignUpRoute
 import com.zoner.android.ui.designSystem.ZonerSpacer
 import com.zoner.android.ui.designSystem.ZonerTextField
 import com.zoner.android.ui.designSystem.ZonerTextLink
 import com.zoner.android.ui.feature.account.sign_up.SignInWithGoogle
 import com.zoner.android.util.DeviceConfiguration
 import com.zoner.android.util.ObserveAsEvents
-import com.zoner.domain.model.CountryModel
-import kotlinx.coroutines.flow.collectLatest
 import org.koin.androidx.compose.koinViewModel
 
 @Composable
@@ -70,15 +72,20 @@ fun SignInScreen(
                 Toast.makeText(navController.context, it.message, Toast.LENGTH_SHORT).show()
             }
 
-            SignInEvent.NavigateToCountrySelection -> {
-                navController.navigate(CountrySelectRoute)
-            }
-            SignInEvent.NavigateToOTPVerification -> {
-                navController.navigate(OTPVerificationRoute)
+            SignInEvent.NavigateToHome -> {
+                navController.navigate(MainAppRoute) {
+                    popUpTo(SignInRoute) {
+                        inclusive = true
+                    }
+                }
             }
 
             SignInEvent.NavigateToSignUp -> {
                 navController.navigate(SignUpRoute)
+            }
+
+            SignInEvent.NavigateToResetPassword -> {
+                navController.navigate(ResetPasswordRoute)
             }
         }
     }
@@ -86,20 +93,20 @@ fun SignInScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val isSigningIn by remember { derivedStateOf { state is SignInState.Loading } }
     val isSigningInWithGoogle by viewModel.isGoogleSignIn.collectAsStateWithLifecycle()
-    val phoneNumber by viewModel.phoneNumber.collectAsStateWithLifecycle()
-    val selectedCountry by viewModel.selectedCountry.collectAsStateWithLifecycle()
-    val useThisCountry =
-        navController.currentBackStackEntry?.savedStateHandle?.getStateFlow<CountryModel?>(
-            "selected_country",null)?.collectAsStateWithLifecycle()
+    val email by viewModel.email.collectAsStateWithLifecycle()
+    val password by viewModel.password.collectAsStateWithLifecycle()
+//    val useThisCountry =
+//        navController.currentBackStackEntry?.savedStateHandle?.getStateFlow<CountryModel?>(
+//            "selected_country",null)?.collectAsStateWithLifecycle()
     val context = LocalContext.current as ComponentActivity
 
-    LaunchedEffect(useThisCountry?.value) {
-        useThisCountry?.value?.let {
-            viewModel.onSelectedCountryUpdated(it)
-            // Optional: Clear savedStateHandle to avoid re-triggering on recomposition
-            navController.currentBackStackEntry?.savedStateHandle?.remove<CountryModel>("selected_country")
-        }
-    }
+//    LaunchedEffect(useThisCountry?.value) {
+//        useThisCountry?.value?.let {
+//            viewModel.onSelectedCountryUpdated(it)
+//            // Optional: Clear savedStateHandle to avoid re-triggering on recomposition
+//            navController.currentBackStackEntry?.savedStateHandle?.remove<CountryModel>("selected_country")
+//        }
+//    }
 
     Scaffold(
         contentWindowInsets = WindowInsets.safeDrawing
@@ -126,13 +133,14 @@ fun SignInScreen(
                         modifier = Modifier.align(Alignment.CenterHorizontally)
                     )
                     SignInScreenForm(
-                        phoneNumber = phoneNumber,
-                        onPhoneNumberChanged = { viewModel.onPhoneNumberUpdated(it) },
+                        email = email,
+                        onEmailChanged = { viewModel.onEmailUpdated(it) },
+                        password = password,
+                        onPasswordChanged = { viewModel.onPasswordUpdated(it) },
                         onSignInClicked = viewModel::signIn,
                         onGoogleSignInClicked = { viewModel.onGoogleClicked(context) },
                         onSignUpClicked = viewModel::onSignUpClicked,
-                        selectedCountry = selectedCountry,
-                        onSelectClicked = viewModel::onCountrySelectionClicked,
+                        onForgotPasswordClicked = viewModel::onForgotPasswordClicked,
                         isSigningIn = isSigningIn,
                         isSigningInWithGoogle = isSigningInWithGoogle
                     )
@@ -152,13 +160,14 @@ fun SignInScreen(
                         modifier = Modifier.weight(1f)
                     )
                     SignInScreenForm(
-                        phoneNumber = phoneNumber,
-                        onPhoneNumberChanged = { viewModel.onPhoneNumberUpdated(it) },
+                        email = email,
+                        onEmailChanged = { viewModel.onEmailUpdated(it) },
+                        password = password,
+                        onPasswordChanged = { viewModel.onPasswordUpdated(it) },
                         onSignInClicked = viewModel::signIn,
-                        onSignUpClicked = viewModel::onSignUpClicked,
                         onGoogleSignInClicked = { viewModel.onGoogleClicked(context) },
-                        selectedCountry = selectedCountry,
-                        onSelectClicked = viewModel::onCountrySelectionClicked,
+                        onSignUpClicked = viewModel::onSignUpClicked,
+                        onForgotPasswordClicked = viewModel::onForgotPasswordClicked,
                         isSigningIn = isSigningIn,
                         isSigningInWithGoogle = isSigningInWithGoogle,
                         modifier = Modifier.weight(1f)
@@ -195,7 +204,7 @@ private fun SignInScreenHeader(
         )
         ZonerSpacer(4.dp)
         Text(
-            text = "Enter your phone number to get an OTP number",
+            text = "Enter your email and password to login",
             style = MaterialTheme.typography.titleSmall
         )
 
@@ -206,47 +215,48 @@ private fun SignInScreenHeader(
 @Composable
 private fun SignInScreenForm(
     modifier: Modifier = Modifier,
-    selectedCountry: CountryModel,
-    phoneNumber: String,
+    email: String,
+    password: String,
     isSigningIn: Boolean,
     isSigningInWithGoogle: Boolean,
-    onPhoneNumberChanged: (String) -> Unit,
+    onEmailChanged: (String) -> Unit,
+    onPasswordChanged: (String) -> Unit,
     onSignUpClicked: () -> Unit,
     onSignInClicked: () -> Unit,
     onGoogleSignInClicked: () -> Unit,
-    onSelectClicked: () -> Unit
+    onForgotPasswordClicked: () -> Unit
 ) {
     Column(
         modifier = modifier
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center
-        ) {
-            // Dial code selector
-            ZonerSelectorTextField(
-                value = "${selectedCountry.emoji} ${selectedCountry.dialCode}",
-                hint = "+254",
-                onClick = onSelectClicked,
-                modifier = Modifier.weight(1f)
+        ZonerTextField(
+            value = email,
+            onValueChange = onEmailChanged,
+            label = "Email",
+            hint = "Email Address",
+            leadingIcon = Icons.Default.Email,
+            keyboardOptions = KeyboardOptions(
+                imeAction = ImeAction.Next,
+                keyboardType = KeyboardType.Email
             )
-            ZonerSpacer(8.dp)
-            // Phone number input
-            ZonerTextField(
-                value = phoneNumber,
-                onValueChange = onPhoneNumberChanged,
-                label = "Phone Number",
-                hint = "Enter your phone number",
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-                modifier = Modifier.weight(2f)
-            )
-        }
-
+        )
+        ZonerSpacer(8.dp)
+        ZonerTextField(
+            value = password,
+            onValueChange = onPasswordChanged,
+            label = "Password",
+            hint = "Enter password",
+            leadingIcon = Icons.Default.Lock,
+            isInputSecret = true,
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done)
+        )
+        ZonerSpacer(8.dp)
+        ZonerTextLink(
+            text = "Forgot Password?",
+            modifier = Modifier.align(Alignment.Start).padding(horizontal = 16.dp),
+            onClick = onForgotPasswordClicked
+        )
         ZonerSpacer(24.dp)
-
         ZonerTextLink(
             text = "Don\'t have an account? Register",
             modifier = Modifier.align(Alignment.CenterHorizontally),

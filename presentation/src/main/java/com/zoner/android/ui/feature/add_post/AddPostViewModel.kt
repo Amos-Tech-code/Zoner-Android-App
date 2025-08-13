@@ -1,10 +1,19 @@
 package com.zoner.android.ui.feature.add_post
 
+import android.content.Context
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.zoner.android.util.MAX_POST_MEDIA
 import com.zoner.android.util.MAX_STATUS_MEDIA
+import com.zoner.android.util.isImage
+import com.zoner.android.util.isVideo
+import com.zoner.domain.StatusState
+import com.zoner.domain.model.Audience
+import com.zoner.domain.model.MediaType
+import com.zoner.domain.model.PostType
+import com.zoner.domain.model.UserStatus
+import com.zoner.domain.usecase.StatusItemsUseCases
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -12,8 +21,14 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.util.UUID
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
 
-class AddPostViewModel : ViewModel() {
+class AddPostViewModel(
+    private val statusItemsUseCases: StatusItemsUseCases,
+    private val context: Context
+) : ViewModel() {
 
     private val _state = MutableStateFlow<AddPostState>(AddPostState.Nothing)
     val state: StateFlow<AddPostState> = _state
@@ -52,7 +67,7 @@ class AddPostViewModel : ViewModel() {
 
     // Tags input (could be from a chip group or manual input)
     fun updateTags(tags: List<String>) {
-        _postFormState.update { it.copy(tags = tags) }
+        _postFormState.update { it.copy(tags = tags.take(30)) }
     }
 
     // Allow repost toggle
@@ -192,8 +207,59 @@ class AddPostViewModel : ViewModel() {
         _statusFormState.update { it.copy(isLoading = isLoading) }
     }
 
-    fun uploadStatus() {
+//    fun uploadStatus() {
+//
+//    }
+    @OptIn(ExperimentalTime::class)
+    fun saveStatusesLocally() {
+        viewModelScope.launch {
+            try {
+                _statusFormState.update { it.copy(isLoading = true) }
 
+                val currentTime = Clock.System.now()
+                val savedStatuses = mutableListOf<UserStatus>()
+
+                statusFormState.value.data.forEach { status ->
+                    status.media?.let { uri ->
+                        try {
+                            val mediaType = when {
+                                uri.isVideo(context) -> MediaType.VIDEO
+                                uri.isImage(context) -> MediaType.IMAGE
+                                else -> throw IllegalArgumentException("Unsupported media type")
+                            }
+
+                            val userStatus = UserStatus(
+                                id = UUID.randomUUID().toString(),
+                                mediaUri = uri,
+                                mediaType = mediaType,
+                                caption = status.caption,
+                                createdAt = currentTime,
+                                state = StatusState.Pending
+                            )
+
+                            statusItemsUseCases.saveUserStatus(userStatus)
+                            savedStatuses.add(userStatus)
+                        } catch (e: Exception) {
+                            //Log.e("AddPostViewModel", "Error saving status", e)
+                            _event.send(AddPostEvent.ShowErrorMessage("Failed to save one status item"))
+                        }
+                    }
+                }
+
+                if (savedStatuses.isNotEmpty()) {
+                    _statusFormState.update { current ->
+                        current.copy(data = current.data.filterNot {
+                            savedStatuses.any { saved -> saved.mediaUri == it.media }
+                        })
+                    }
+                    _event.send(AddPostEvent.ShowSuccessMessage("Saved ${savedStatuses.size} statuses"))
+                }
+            } catch (e: Exception) {
+                _event.send(AddPostEvent.ShowErrorMessage("Failed to save status items"))
+            } finally {
+                _statusFormState.update { it.copy(isLoading = false) }
+            }
+        }
     }
 
     fun playVideo(uri: Uri) {
@@ -226,15 +292,4 @@ class AddPostViewModel : ViewModel() {
         val media: Uri? = null,
         val caption: String = ""
     )
-}
-
-
-enum class PostType {
-    POST, STATUS
-}
-
-enum class Audience(val displayName: String) {
-    PUBLIC("Public"),
-    PEOPLE_NEAR_ME("People Near me"),
-    CUSTOM("Custom")
 }

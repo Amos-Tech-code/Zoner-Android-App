@@ -3,7 +3,9 @@ package com.zoner.android.ui.designSystem
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -14,6 +16,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
@@ -21,6 +25,8 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.InputChip
+import androidx.compose.material3.InputChipDefaults
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -38,8 +44,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
@@ -103,7 +112,7 @@ fun ZonerTextField(
             placeholder = {
                Text(text = hint, style = MaterialTheme.typography.bodyLarge)
             },
-            visualTransformation = if (isInputSecret) {
+            visualTransformation = if (isInputSecret && !isPasswordVisible) {
                 PasswordVisualTransformation(mask = '*')
             } else VisualTransformation.None,
             keyboardOptions = keyboardOptions,
@@ -284,6 +293,103 @@ fun ZonerDropdownSelector(
                 )
             }
         }
+    }
+}
+
+
+
+@Composable
+fun TagsField(
+    tags: List<String>,
+    onTagsChange: (List<String>) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var currentTag by remember { mutableStateOf("") }
+    val focusManager = LocalFocusManager.current
+
+    Column(modifier = modifier) {
+        // Display existing tags as chips
+        if (tags.isNotEmpty()) {
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                tags.forEach { tag ->
+                    InputChip(
+                        selected = false,
+                        onClick = {
+                            // Remove tag when clicked
+                            onTagsChange(tags.filter { it != tag })
+                        },
+                        label = { Text("#$tag") },
+                        trailingIcon = {
+                            Icon(
+                                Icons.Default.Close,
+                                contentDescription = "Remove tag",
+                                modifier = Modifier.size(16.dp)
+                            )
+                        },
+                        colors = InputChipDefaults.inputChipColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                            labelColor = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+        }
+
+        // Tag input field
+        OutlinedTextField(
+            value = currentTag,
+            onValueChange = { currentTag = it },
+            modifier = Modifier.fillMaxWidth(),
+            label = { Text("Add tags") },
+            placeholder = { Text("Type and press + to add") },
+            trailingIcon = {
+                if (currentTag.isNotEmpty()) {
+                    IconButton(
+                        onClick = {
+                            addTag(currentTag, tags, onTagsChange)
+                            currentTag = ""
+                        }
+                    ) {
+                        Icon(Icons.Default.Add, "Add tag")
+                    }
+                }
+            },
+            keyboardOptions = KeyboardOptions(
+                imeAction = ImeAction.Done,
+                keyboardType = KeyboardType.Text
+            ),
+            keyboardActions = KeyboardActions(
+                onDone = {
+                    addTag(currentTag, tags, onTagsChange)
+                    currentTag = ""
+                    focusManager.clearFocus()
+                }
+            ),
+            singleLine = true,
+            shape = RoundedCornerShape(10.dp),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                cursorColor = MaterialTheme.colorScheme.primary,
+                focusedBorderColor = MaterialTheme.colorScheme.outline,
+                unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(0.4f)
+            )
+        )
+    }
+}
+
+private fun addTag(tag: String, currentTags: List<String>, onTagsChange: (List<String>) -> Unit) {
+    val cleanedTag = tag.trim()
+        .replace(Regex("[^a-zA-Z0-9]"), "") // Remove special characters
+        .lowercase()
+
+    if (cleanedTag.isNotEmpty() && !currentTags.contains(cleanedTag)) {
+        onTagsChange(currentTags + cleanedTag)
     }
 }
 

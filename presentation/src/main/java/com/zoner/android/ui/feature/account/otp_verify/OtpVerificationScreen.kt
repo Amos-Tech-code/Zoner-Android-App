@@ -54,9 +54,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import androidx.window.core.layout.WindowSizeClass
 import com.zoner.android.R
-import com.zoner.android.navigation.HomeRoute
-import com.zoner.android.navigation.MainAppRoute
-import com.zoner.android.navigation.SignInRoute
+import com.zoner.android.ui.navigation.MainAppRoute
+import com.zoner.android.ui.navigation.SignInRoute
 import com.zoner.android.ui.designSystem.ZonerSpacer
 import com.zoner.android.util.DeviceConfiguration
 import com.zoner.android.util.ObserveAsEvents
@@ -72,21 +71,17 @@ fun OtpVerificationScreen(
 
     ObserveAsEvents(viewModel.event) { event ->
         when(event) {
-            OtpVerificationEvent.NavigateToHome -> {
-                // Handle navigation
+            is OtpVerificationEvent.ShowErrorMessage -> {
+                Toast.makeText(navController.context, event.message, Toast.LENGTH_SHORT).show()
+
+            }
+
+            OtpVerificationEvent.NavigateToHome-> {
                 navController.navigate(MainAppRoute) {
                     popUpTo(SignInRoute) {
                         inclusive = true
                     }
                 }
-//                navController.navigate("main") {
-//                    // Clear the entire back stack
-//                    popUpTo(0)
-//                }
-            }
-            is OtpVerificationEvent.ShowErrorMessage -> {
-                Toast.makeText(navController.context, event.message, Toast.LENGTH_SHORT).show()
-
             }
         }
     }
@@ -498,7 +493,7 @@ fun OtpVerificationForm(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(50.dp),
-            enabled = state.otp.length == 4 && !state.isLoading && !state.isResending,
+            enabled = !state.isLoading && !state.isResending,
             shape = RoundedCornerShape(8.dp)
         ) {
             if (state.isLoading) {

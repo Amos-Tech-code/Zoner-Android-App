@@ -2,32 +2,23 @@ package com.zoner.android.ui.feature.add_post
 
 import android.content.Context
 import android.net.Uri
-import android.os.Build
-import android.os.VibrationEffect
-import android.os.Vibrator
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.Spring
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.animateScrollBy
-import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -35,46 +26,31 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.filled.AddPhotoAlternate
-import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Collections
-import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Public
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -92,49 +68,45 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
-import coil.compose.AsyncImage
-import com.zoner.android.navigation.CreateBusinessRoute
+import com.zoner.android.ui.navigation.CreateBusinessRoute
+import com.zoner.android.ui.navigation.MainAppRoute
 import com.zoner.android.ui.designSystem.AccountRequiredDialog
+import com.zoner.android.ui.designSystem.DropdownMenuButton
 import com.zoner.android.ui.designSystem.FullScreenVideoPlayer
 import com.zoner.android.ui.designSystem.VideoThumbnail
-import com.zoner.android.ui.designSystem.ZonerDropdownSelector
+import com.zoner.android.ui.designSystem.ZonerAsyncImage
 import com.zoner.android.ui.designSystem.ZonerSpacer
-import com.zoner.android.ui.designSystem.ZonerTextField
-import com.zoner.android.ui.theme.Info
-import com.zoner.android.ui.theme.Success
+import com.zoner.android.ui.feature.profile.User
+import com.zoner.android.ui.theme.ZonerInfo
 import com.zoner.android.util.MAX_POST_MEDIA
 import com.zoner.android.util.MAX_STATUS_MEDIA
 import com.zoner.android.util.ObserveAsEvents
 import com.zoner.android.util.isVideoUri
-import kotlinx.coroutines.delay
+import com.zoner.domain.model.Audience
+import com.zoner.domain.model.PostType
 import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
 
 @Composable
 fun AddPostScreen(
     navController: NavController,
+    postTypeParam: PostType? = null,
+    navigateUp: () -> Unit = {},
     viewModel: AddPostViewModel = koinViewModel()
 ) {
 
@@ -145,15 +117,29 @@ fun AddPostScreen(
     var showAccountRequiredDialog by remember { mutableStateOf(true) }
     val snackBarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
-    val maxSelectableMedia = if (postType == PostType.POST) MAX_POST_MEDIA else MAX_STATUS_MEDIA
+    val maxSelectableMedia = remember(postType) {
+        when (postType) {
+            PostType.POST -> MAX_POST_MEDIA
+            PostType.STATUS -> MAX_STATUS_MEDIA
+        }
+    }
     // Add this state for camera handling
     var capturedImageUri by remember { mutableStateOf<Uri?>(null) }
+
+    LaunchedEffect(postTypeParam != null) {
+        postTypeParam?.let { viewModel.updatePostType(postTypeParam) }
+    }
 
     // Events
     ObserveAsEvents(viewModel.event) {
         when (it) {
             is AddPostEvent.ShowErrorMessage -> {
                 scope.launch{ snackBarHostState.showSnackbar(it.message) }
+            }
+
+            is AddPostEvent.ShowSuccessMessage -> {
+                Toast.makeText(navController.context, it.message, Toast.LENGTH_LONG).show()
+                navigateUp()
             }
         }
     }
@@ -209,7 +195,7 @@ fun AddPostScreen(
         }
     }
 
-    BackHandler(enabled = state !is AddPostState.Nothing) {
+    BackHandler(enabled = state !is AddPostState.Nothing && state !is AddPostState.AccountRequired) {
         viewModel.updateUIState(AddPostState.Nothing)
     }
 
@@ -219,6 +205,7 @@ fun AddPostScreen(
                 showDialog = showAccountRequiredDialog,
                 onDismissRequest = {
                     showAccountRequiredDialog = false
+                    navController.navigate(MainAppRoute)
                 },
                 onConfirmButtonClick = {
                     showAccountRequiredDialog = false
@@ -232,7 +219,8 @@ fun AddPostScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(16.dp)
-                    .verticalScroll(rememberScrollState()),
+                    .verticalScroll(rememberScrollState())
+                    .imePadding(),
                 description = postDataForm.description,
                 category = postDataForm.category,
                 location = postDataForm.location,
@@ -242,7 +230,7 @@ fun AddPostScreen(
                 onLocationChange = { },
                 onPriceChange = { viewModel.updatePrice(it) },
                 onDescriptionChange = { viewModel.updateDescription(it) },
-                onTagsChange = { viewModel.updateTags(listOf(it)) },
+                onTagsChange = { viewModel.updateTags(it) },
                 onPreviewClick = { viewModel.updateUIState(AddPostState.PreviewPost) },
                 onPostClick = { viewModel.uploadPost() },
                 onBackClick = { viewModel.updateUIState( AddPostState.Nothing) }
@@ -252,7 +240,7 @@ fun AddPostScreen(
         is AddPostState.Nothing -> {
             CreatePostScreen(
                 onProceedToCaption = { viewModel.updateUIState(AddPostState.CaptionPost) },
-                onShareStatus = { viewModel.uploadStatus() },
+                onShareStatus = { viewModel.saveStatusesLocally() },
                 selectedMedia = if (postType == PostType.POST) postDataForm.uris else statusDataForm.data.map { it.media },
                 audience = postDataForm.audience,
                 allowReposting = postDataForm.allowReposting,
@@ -333,12 +321,25 @@ fun AddPostScreen(
                     viewModel.playVideo(uri)
                 },
                 snackBarHostState = snackBarHostState,
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier
+                    .fillMaxSize()
             )
         }
 
         AddPostState.PreviewPost -> {
-
+            PostPreview(
+                modifier = Modifier.fillMaxSize(),
+                mediaUris = postDataForm.uris,
+                caption = postDataForm.description,
+                category = postDataForm.category,
+                location = postDataForm.location,
+                price = postDataForm.price,
+                tags = postDataForm.tags,
+                onBackClick = {
+                    viewModel.updateUIState(AddPostState.CaptionPost)
+                },
+                onPostClick = viewModel::uploadPost,
+            )
         }
 
         AddPostState.ShowCamera -> {
@@ -375,7 +376,7 @@ fun AddPostScreen(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CreatePostScreen(
+private fun CreatePostScreen(
     selectedMedia: List<Uri?>,
     statusItems: List<AddPostViewModel.Status>,
     audience: Audience,
@@ -519,25 +520,26 @@ private fun CreatePostTopBar(
         navigationIcon = {
             Box(
                 modifier = Modifier
+                    .size(40.dp)
                     .clip(CircleShape)
-                    .background(color = Info, shape = CircleShape)
-                    .size(48.dp)
-                    .padding(horizontal = 16.dp),
+                    .background(color = ZonerInfo, shape = CircleShape),
                 contentAlignment = Alignment.Center
             ) {
-//                AsyncImage(
-//                    model = ,
-//                    contentDescription = "Profile picture",
-//                    contentScale = ContentScale.Crop,
-//                )
-                Text(
-                    text = "AK",
-                    fontSize = 11.sp,
-                    color = Color.White,
-                    minLines = 1,
-                    textAlign = TextAlign.Center,
-                    fontWeight = FontWeight.Bold
+                // Use this if you have a profile picture
+                ZonerAsyncImage(
+                    imageUrl = "https://picsum.photos/200/200",
+                    contentDescription = "Profile picture",
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
                 )
+//                Text(
+//                    text = "AK",
+//                    fontSize = 14.sp,
+//                    color = Color.White,
+//                    minLines = 1,
+//                    textAlign = TextAlign.Center,
+//                    fontWeight = FontWeight.Bold
+//                )
             }
         },
         scrollBehavior = scrollBehavior
@@ -587,7 +589,7 @@ private fun PostTypeSelector(
     selectedType: PostType,
     onTypeSelected: (PostType) -> Unit
 ) {
-    val options = listOf(PostType.STATUS, PostType.POST)
+    val options = listOf(PostType.POST, PostType.STATUS)
 
     Row(
         modifier = Modifier
@@ -699,7 +701,7 @@ private fun EmptyMediaPlaceholder(
         modifier = modifier,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        val brushColors = listOf(Info, Color.Transparent)
+        val brushColors = listOf(ZonerInfo, ZonerInfo.copy(alpha = 0.2f))
         val emptyMediaItems = listOf(
             EmptyMedia(1, Icons.Default.CameraAlt, "Take a photo"),
             EmptyMedia(2, Icons.Default.AddPhotoAlternate, "Add a single item"),
@@ -778,204 +780,6 @@ private fun EmptyMediaPlaceholder(
 
 
 @Composable
-fun StatusMediaCarousel(
-    modifier: Modifier = Modifier,
-    items: List<AddPostViewModel.Status>,
-    onCaptionChange: (index: Int, caption: String) -> Unit,
-    onRemoveItem: (index: Int) -> Unit,
-    onMoveItem: (from: Int, to: Int) -> Unit,
-    onVideoPlayClicked: (Uri) -> Unit
-) {
-    val lazyListState = rememberLazyListState()
-    val density = LocalDensity.current
-    val haptic = LocalHapticFeedback.current
-    val scrollScope = rememberCoroutineScope()
-    val context = LocalContext.current
-
-    LazyRow(
-        state = lazyListState,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        contentPadding = PaddingValues(horizontal = 16.dp),
-        modifier = modifier
-    ) {
-        itemsIndexed(
-            items,
-            key = { index, status -> "${status.media.toString()}-$index" }
-        ) { index, status ->
-            var isDragging by remember { mutableStateOf(false) }
-            var dragOffset by remember { mutableStateOf(0f) }
-            val size by animateDpAsState(
-                targetValue = if (isDragging) 240.dp else 220.dp,
-                animationSpec = spring(stiffness = Spring.StiffnessMediumLow)
-            )
-            val elevation by animateDpAsState(
-                targetValue = if (isDragging) 8.dp else 0.dp
-            )
-            val alpha by animateFloatAsState(
-                targetValue = if (isDragging) 0.6f else 1f,
-                animationSpec = tween(durationMillis = 100)
-            )
-
-            // Auto-scroll when dragging near edges
-            if (isDragging) {
-                LaunchedEffect(isDragging) {
-                    while (isDragging) {
-                        with(density) {
-                            val viewportWidth = lazyListState.layoutInfo.viewportEndOffset - lazyListState.layoutInfo.viewportStartOffset
-                            val centerX = dragOffset + size.toPx() / 2
-
-                            // Calculate scroll speed based on how close to edge
-                            val scrollSpeed = when {
-                                centerX > viewportWidth * 0.9f -> 50f
-                                centerX > viewportWidth * 0.8f -> 30f
-                                centerX < viewportWidth * 0.1f -> -50f
-                                centerX < viewportWidth * 0.2f -> -30f
-                                else -> 0f
-                            }
-
-                            if (scrollSpeed != 0f) {
-                                scrollScope.launch {
-                                    lazyListState.animateScrollBy(scrollSpeed)
-                                }
-                            }
-                        }
-                        delay(16) // ~60fps
-                    }
-                }
-            }
-
-            Box(
-                modifier = Modifier
-                    .width(size)
-                    .aspectRatio(9f / 16f)
-                    .shadow(elevation, RoundedCornerShape(16.dp))
-                    .graphicsLayer {
-                        translationX = if (isDragging) dragOffset else 0f
-                        this.alpha = if (isDragging) 1f else alpha
-                    }
-                    .pointerInput(Unit) {
-                        detectDragGesturesAfterLongPress(
-                            onDragStart = {
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                isDragging = true
-                                // Vibrate for better feedback
-                                val vibrator =
-                                    context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
-                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                                    vibrator.vibrate(
-                                        VibrationEffect.createOneShot(
-                                            15,
-                                            VibrationEffect.DEFAULT_AMPLITUDE
-                                        )
-                                    )
-                                } else {
-                                    vibrator.vibrate(15)
-                                }
-                            },
-                            onDrag = { change, dragAmount ->
-                                change.consume()
-                                dragOffset += dragAmount.x
-
-                                // Calculate threshold based on item size
-                                val threshold = size.toPx() * 0.3f
-
-                                // Check if we should swap positions
-                                when {
-                                    dragOffset < -threshold && index > 0 -> {
-                                        onMoveItem(index, index - 1)
-                                        dragOffset = 0f
-                                    }
-
-                                    dragOffset > threshold && index < items.lastIndex -> {
-                                        onMoveItem(index, index + 1)
-                                        dragOffset = 0f
-                                    }
-                                }
-                            },
-                            onDragEnd = {
-                                // Animate to final position
-                                dragOffset = 0f
-                                isDragging = false
-                            },
-                            onDragCancel = {
-                                dragOffset = 0f
-                                isDragging = false
-                            }
-                        )
-                    }
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
-                    .animateItem()
-            ) {
-                if (status.media?.let { context.isVideoUri(it) } == true) {
-                    VideoThumbnail(status.media, onVideoPlayClicked = { onVideoPlayClicked(status.media) })
-                } else {
-                    AsyncImage(
-                        model = status.media,
-                        contentDescription = "Story Media $index",
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
-                    )
-                }
-
-                // Remove button
-                IconButton(
-                    onClick = { onRemoveItem(index) },
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(8.dp)
-                        .background(Color.Black.copy(alpha = 0.5f), CircleShape)
-                        .size(28.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Close,
-                        contentDescription = "Remove",
-                        tint = Color.White,
-                    )
-                }
-
-                // Caption input
-                OutlinedTextField(
-                    value = status.caption,
-                    onValueChange = { onCaptionChange(index, it) },
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .padding(8.dp)
-                        .fillMaxWidth()
-                        .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(12.dp)),
-                    placeholder = {
-                        Text("Write a caption...", color = Color.White.copy(alpha = 0.6f))
-                    },
-                    colors = OutlinedTextFieldDefaults.colors(
-                        unfocusedTextColor = Color.White,
-                        focusedTextColor = Color.White,
-                        unfocusedContainerColor = Color.Black.copy(0.6f),
-                        focusedContainerColor = Color.Black.copy(0.6f),
-                        unfocusedBorderColor = Color.Transparent,
-                        focusedBorderColor = Color.Transparent
-                    ),
-                    shape = RoundedCornerShape(12.dp),
-                    textStyle = TextStyle(color = Color.White, fontSize = 14.sp),
-                    maxLines = 2
-                )
-
-                // Drag Handle (☰)
-                Icon(
-                    imageVector = Icons.Default.DragHandle,
-                    contentDescription = "Drag",
-                    tint = Color.White,
-                    modifier = Modifier
-                        .align(Alignment.TopStart)
-                        .padding(8.dp)
-                        .size(28.dp)
-                )
-            }
-        }
-    }
-}
-
-
-@Composable
 private fun SinglePostMediaView(
     uri: Uri,
     context: Context,
@@ -1001,8 +805,8 @@ private fun SinglePostMediaView(
                 onVideoPlayClicked = { onVideoPlayClicked(uri) }
             )
         } else {
-            AsyncImage(
-                model = uri,
+            ZonerAsyncImage(
+                imageUrl = uri,
                 contentDescription = "Selected media",
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
@@ -1059,8 +863,8 @@ private fun MultiplePostMediaView(
                 if (isVideoList[page]) {
                     VideoThumbnail(uri = uri, onVideoPlayClicked = { onVideoPlayClicked(uri) })
                 } else {
-                    AsyncImage(
-                        model = mediaUris[page],
+                    ZonerAsyncImage(
+                        imageUrl = mediaUris[page],
                         contentDescription = "Media ${page + 1}",
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize()
@@ -1105,27 +909,45 @@ private fun PageIndicators(
     modifier: Modifier = Modifier,
     activeColor: Color = MaterialTheme.colorScheme.primary,
     inactiveColor: Color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
-    indicatorSize: Dp = 8.dp
+    totalWidth: Dp = 200.dp, // Max total width of all indicators
+    height: Dp = 8.dp,
+    spacing: Dp = 6.dp
 ) {
+    val indicatorWidth = remember(count, spacing) {
+        val totalSpacing = spacing * (count - 1)
+        val availableWidth = totalWidth - totalSpacing
+        (availableWidth / count).coerceAtLeast(8.dp)
+    }
+
     Row(
-        modifier = modifier,
-        horizontalArrangement = Arrangement.Center
+        modifier = modifier.width(totalWidth),
+        horizontalArrangement = Arrangement.spacedBy(spacing),
+        verticalAlignment = Alignment.CenterVertically
     ) {
         repeat(count) { index ->
+            val isActive = index == currentPage
+
+            val animatedWidth by animateDpAsState(
+                targetValue = if (isActive) indicatorWidth * 1.6f else indicatorWidth,
+                label = "IndicatorWidth"
+            )
+
+            val animatedColor by animateColorAsState(
+                targetValue = if (isActive) activeColor else inactiveColor,
+                label = "IndicatorColor"
+            )
+
             Box(
                 modifier = Modifier
-                    .padding(horizontal = 4.dp)
-                    .size(indicatorSize)
-                    .width(20.dp)
-                    .clip(CircleShape)
-                    .background(
-                        if (currentPage == index) activeColor
-                        else inactiveColor
-                    )
+                    .height(height)
+                    .width(animatedWidth)
+                    .clip(RoundedCornerShape(50))
+                    .background(animatedColor)
             )
         }
     }
 }
+
 
 
 @Composable
@@ -1161,60 +983,6 @@ private fun AudiencePostSelector(
 
 
 @Composable
-private fun DropdownMenuButton(
-    selectedOption: String,
-    options: List<String>,
-    onOptionSelected: (Int) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    var expanded by remember { mutableStateOf(false) }
-
-    Box(modifier = modifier.wrapContentSize(Alignment.TopStart)) {
-        OutlinedButton(
-            onClick = { expanded = true },
-            shape = RoundedCornerShape(4.dp),
-            colors = ButtonDefaults.outlinedButtonColors(
-                contentColor = MaterialTheme.colorScheme.onSurface
-            )
-        ) {
-            Text(selectedOption)
-            Icon(
-                imageVector = Icons.Default.ArrowDropDown,
-                contentDescription = "Dropdown",
-                modifier = Modifier.size(16.dp)
-            )
-        }
-
-        DropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false },
-            containerColor = MaterialTheme.colorScheme.surface,
-            modifier = Modifier.width(IntrinsicSize.Max)
-        ) {
-            options.forEachIndexed { index, option ->
-                DropdownMenuItem(
-                    onClick = {
-                        onOptionSelected(index)
-                        expanded = false
-                    },
-                    text = {
-                        Text(
-                            text = option,
-                            style = if (option == selectedOption) {
-                                MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold)
-                            } else {
-                                MaterialTheme.typography.bodySmall
-                            }
-                        )
-                    },
-                )
-            }
-        }
-    }
-}
-
-
-@Composable
 private fun AdvancedOptionsSection(
     isExpanded: Boolean,
     postType: PostType,
@@ -1244,15 +1012,7 @@ private fun AdvancedOptionsSection(
         }
 
         AnimatedVisibility(visible = isExpanded) {
-            Column {
-                if (postType == PostType.STATUS) {
-                    SwitchWithText(
-                        text = "Add to Story Archive",
-                        checked = true,
-                        onCheckedChange = { /* Handle change */ }
-                    )
-                }
-
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 SwitchWithText(
                     text = "Allow Resharing",
                     checked = allowReposting,
@@ -1264,6 +1024,14 @@ private fun AdvancedOptionsSection(
                     checked = commentsDisabled,
                     onCheckedChange = { onCommentsDisableChanged() }
                 )
+                if (postType == PostType.STATUS) {
+                    SwitchWithText(
+                        text = "Add to Story Archive",
+                        checked = true,
+                        onCheckedChange = { /* Handle change */ }
+                    )
+                }
+
             }
         }
     }
@@ -1278,163 +1046,21 @@ private fun SwitchWithText(
     modifier: Modifier = Modifier
 ) {
     Row(
-        modifier = modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
+        modifier = modifier
+            .fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(text = text)
+        Text(
+            text = text,
+            modifier = Modifier.weight(1f), // text takes up remaining space
+            style = MaterialTheme.typography.bodyMedium
+        )
+
         Switch(
             checked = checked,
             onCheckedChange = onCheckedChange,
+            modifier = Modifier.scale(0.9f) // optional: slightly reduce switch size for aesthetics
         )
-    }
-}
-
-
-@Composable
-private fun CaptionPost(
-    modifier: Modifier = Modifier,
-    description: String,
-    category: String,
-    location: String,
-    price: String?,
-    tags: List<String>,
-    onCategoryChange: (String) -> Unit,
-    onLocationChange: () -> Unit,
-    onPriceChange: (String) -> Unit,
-    onDescriptionChange: (String) -> Unit,
-    onTagsChange: (String) -> Unit,
-    onPreviewClick: () -> Unit,
-    onPostClick: () -> Unit,
-    onBackClick: () -> Unit
-) {
-    Column(
-        modifier = modifier
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(
-                onClick = onBackClick
-            ) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                    contentDescription = "Go back"
-                )
-            }
-            Text("CAPTION POST", style = MaterialTheme.typography.titleLarge)
-        }
-        ZonerTextField(
-            text = "Description",
-            value = description,
-            onValueChange = onDescriptionChange,
-            hint = "Enter business name",
-            singleLine = false
-        )
-        ZonerSpacer(16.dp)
-        ZonerDropdownSelector(
-            label = "Category",
-            selectedOption = category,
-            options = listOf("Salon", "Services", "Foods", "Fashion"),
-            hint = "Select Category",
-            onOptionSelected = onCategoryChange
-        )
-        ZonerSpacer(16.dp)
-        Column {
-            Text(text = "Posting from", fontWeight = FontWeight.SemiBold)
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center
-            ) {
-                Text(text = location)
-                Spacer(modifier = Modifier.weight(1f))
-                AssistChip(
-                    onClick = { onLocationChange() },
-                    label = { Text("Change") },
-                    colors = AssistChipDefaults.assistChipColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                        labelColor = MaterialTheme.colorScheme.primary
-                    )
-                )
-            }
-        }
-        ZonerSpacer(16.dp)
-        ZonerTextField(
-            text = "Price (Optional)",
-            value = price ?: "",
-            onValueChange = onPriceChange,
-            hint = "Set price for your post item",
-            keyboardOptions = KeyboardOptions(
-                keyboardType = KeyboardType.Number,
-                imeAction = ImeAction.Next
-            )
-        )
-        ZonerSpacer(16.dp)
-        ZonerTextField(
-            text = "Tags",
-            value = tags.toString(),
-            onValueChange = onTagsChange,
-            hint = "Tag your post",
-        )
-        ZonerSpacer(16.dp)
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center
-        ) {
-            Button(
-                onClick = onPreviewClick,
-                shape = RoundedCornerShape(10.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary
-                ),
-                contentPadding = PaddingValues(horizontal = 24.dp)
-            ) {
-                Text(text = "Preview")
-            }
-            ZonerSpacer(16.dp)
-            Button(
-                shape = RoundedCornerShape(10.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Success
-                ),
-                contentPadding = PaddingValues(horizontal = 24.dp),
-                onClick = onPostClick
-            ) {
-                Text(text = "Post")
-            }
-        }
-    }
-}
-
-
-@Composable
-fun PostPreview(
-    modifier: Modifier = Modifier,
-    onBackClick: () -> Unit
-) {
-    Column(
-        modifier = modifier
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(
-                onClick = onBackClick
-            ) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                    contentDescription = "Go back"
-                )
-            }
-            Text("Post Preview", style = MaterialTheme.typography.titleLarge)
-        }
-        ZonerSpacer(16.dp)
     }
 }
 

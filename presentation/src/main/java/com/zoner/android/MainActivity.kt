@@ -11,18 +11,20 @@ import android.view.animation.AccelerateInterpolator
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.safeDrawing
-import androidx.compose.material3.Scaffold
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.zIndex
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.rememberNavController
-import com.zoner.android.navigation.AppNavGraph
-import com.zoner.android.navigation.SignInRoute
+import com.zoner.android.ui.navigation.AppNavGraph
+import com.zoner.android.ui.navigation.SignInRoute
+import com.zoner.android.ui.designSystem.ConnectionBanner
 import com.zoner.android.ui.theme.ZonerTheme
 import org.koin.androidx.viewmodel.ext.android.viewModel
 
@@ -67,16 +69,23 @@ class MainActivity : ComponentActivity() {
             ZonerTheme {
 
                 val startDestination by viewModel.startDestination.collectAsStateWithLifecycle()
+                val bannerState by viewModel.bannerState.collectAsStateWithLifecycle()
 
                 if (startDestination != null) {
-                    Scaffold(
-                        modifier = Modifier.fillMaxSize(),
-                        contentWindowInsets = WindowInsets.safeDrawing
-                    ) {
+                    Box(modifier = Modifier.fillMaxSize()) {
                         AppNavGraph(
                             navController = rememberNavController(),
                             startDestination = startDestination ?: SignInRoute,
                             windowSizeClass = currentWindowAdaptiveInfo().windowSizeClass
+                        )
+
+                        // 2️⃣ Global Banner (Rendered ABOVE all content)
+                        ConnectionBanner(
+                            state = bannerState,
+                            modifier = Modifier
+                                .align(Alignment.TopCenter)
+                                .statusBarsPadding() // Ensure it's below status bar
+                                .zIndex(100f) // Force it to stay on top
                         )
                     }
                 }

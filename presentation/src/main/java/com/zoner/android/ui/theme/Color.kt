@@ -16,12 +16,18 @@ val GoogleBlue = Color(0xFF1976D2)
 val GoogleGreen = Color(0xFF4CAF50)
 val GoogleRed = Color(0xFFFF3D00)
 val GoogleOrange = Color(0xFFFFC107)
+// Used for likes
+val PurpleRed = Color(0xFFF91880)
+// Borders & Dividers
+val DividerColor = Color(0xFF38444D)
+val BorderColor = Color(0xFF2F3D49)
+
 
 // App Status Colors
-val Info = GoogleBlue
-val Success = GoogleGreen
-val Warning = GoogleOrange
-val Error = GoogleRed
+val ZonerInfo = GoogleBlue
+val ZonerSuccess = GoogleGreen
+val ZonerWarning = GoogleOrange
+val ZonerError = GoogleRed
 
 
 /**
@@ -41,7 +47,7 @@ object DimColors {
     // Accents
     val PrimaryBlue = Color(0xFF1D9BF0)
     val PrimaryBluePressed = Color(0xFF1A8CD8)
-    val ErrorRed = Color(0xFFF91880) // Used for likes/errors
+    val ErrorRed = GoogleRed
     val SuccessGreen = Color(0xFF00BA7C) // Used for retweets
     val WarningYellow = Color(0xFFFFD400) // Used for gold badges
 

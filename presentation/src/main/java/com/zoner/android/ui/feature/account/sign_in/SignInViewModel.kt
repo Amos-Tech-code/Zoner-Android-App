@@ -22,45 +22,57 @@ class SignInViewModel : BaseAuthViewModel() {
     private val _isGoogleSignIn = MutableStateFlow(false)
     val isGoogleSignIn = _isGoogleSignIn.asStateFlow()
 
-    private val _phoneNumber = MutableStateFlow("")
-    val phoneNumber = _phoneNumber.asStateFlow()
+    private val _email = MutableStateFlow("")
+    val email = _email.asStateFlow()
 
-    private val _selectedCountry = MutableStateFlow(
-        CountryModel(
-            name = "Kenya",
-            code = "KE",
-            emoji = "🇰🇪",
-            dialCode = "+254"
-        )
-    )
-    val selectedCountry = _selectedCountry.asStateFlow()
+    private val _password = MutableStateFlow("")
+    val password = _password.asStateFlow()
 
-    fun onPhoneNumberUpdated(value: String) {
-        _phoneNumber.value = value
+//    private val _selectedCountry = MutableStateFlow(
+//        CountryModel(
+//            name = "Kenya",
+//            code = "KE",
+//            emoji = "🇰🇪",
+//            dialCode = "+254"
+//        )
+//    )
+//    val selectedCountry = _selectedCountry.asStateFlow()
+
+    fun onEmailUpdated(value: String) {
+        _email.value = value
+    }
+    fun onPasswordUpdated(value: String) {
+        _password.value = value
     }
 
-    fun onSelectedCountryUpdated(country: CountryModel) {
-        _selectedCountry.value = country
-    }
+//    fun onSelectedCountryUpdated(country: CountryModel) {
+//        _selectedCountry.value = country
+//    }
 
     fun signIn() {
         viewModelScope.launch {
             _state.value = SignInState.Loading
             delay(1000)
             _state.value = SignInState.Success
-            _event.send(SignInEvent.NavigateToOTPVerification)
+            _event.send(SignInEvent.NavigateToHome)
         }
     }
 
-    fun onCountrySelectionClicked() {
-        viewModelScope.launch {
-            _event.send(SignInEvent.NavigateToCountrySelection)
-        }
-    }
+//    fun onCountrySelectionClicked() {
+//        viewModelScope.launch {
+//            _event.send(SignInEvent.NavigateToCountrySelection)
+//        }
+//    }
 
     fun onSignUpClicked() {
         viewModelScope.launch {
             _event.send(SignInEvent.NavigateToSignUp)
+        }
+    }
+
+    fun onForgotPasswordClicked() {
+        viewModelScope.launch {
+            _event.send(SignInEvent.NavigateToResetPassword)
         }
     }
 

@@ -9,5 +9,7 @@
     <color name="white">#FFFFFFFF</color>
 
     <color name="splash_background">#FFFFFF</color> <!-- Light mode -->
+    <color name="splash_text">#FF000000</color>
+
 
 </resources>

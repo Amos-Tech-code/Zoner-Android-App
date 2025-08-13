@@ -6,4 +6,6 @@ sealed class SignUpEvent {
 
     data object NavigateToSignIn : SignUpEvent()
 
+    data object NavigateToVerification: SignUpEvent()
+
 }

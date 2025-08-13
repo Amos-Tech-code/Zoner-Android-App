@@ -24,6 +24,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material3.Button
@@ -36,7 +37,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
@@ -49,7 +53,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import androidx.window.core.layout.WindowSizeClass
 import com.zoner.android.R
-import com.zoner.android.navigation.SignInRoute
+import com.zoner.android.ui.navigation.OTPVerificationRoute
+import com.zoner.android.ui.navigation.SignInRoute
 import com.zoner.android.ui.designSystem.ZonerSpacer
 import com.zoner.android.ui.designSystem.ZonerTextField
 import com.zoner.android.ui.designSystem.ZonerTextLink
@@ -70,8 +75,12 @@ fun SignUpScreen(
                 Toast.makeText(navController.context, it.message, Toast.LENGTH_SHORT).show()
             }
 
-            SignUpEvent.NavigateToSignIn -> {
-                navController.navigate(SignInRoute)
+            is SignUpEvent.NavigateToSignIn -> {
+                navController.popBackStack()
+            }
+
+            SignUpEvent.NavigateToVerification -> {
+                navController.navigate(OTPVerificationRoute)
             }
         }
     }
@@ -111,6 +120,10 @@ fun SignUpScreen(
                         onEmailChanged = { viewModel.onEmailUpdated(it) },
                         phoneNumber = formState.phoneNumber,
                         onPhoneChanged = { viewModel.onPhoneNumberUpdated(it) },
+                        password = formState.password,
+                        onPasswordChanged = { viewModel.onPasswordUpdated(it) },
+                        confirmPassword = formState.confirmPassword,
+                        onCPasswordChanged = { viewModel.onCPasswordUpdated(it) },
                         modifier = Modifier.fillMaxWidth(),
                         onSignInClick = viewModel::onSignInClicked,
                         onSignUpClick = viewModel::register,
@@ -138,6 +151,10 @@ fun SignUpScreen(
                         onEmailChanged = { viewModel.onEmailUpdated(it) },
                         phoneNumber = formState.phoneNumber,
                         onPhoneChanged = { viewModel.onPhoneNumberUpdated(it) },
+                        password = formState.password,
+                        onPasswordChanged = { viewModel.onPasswordUpdated(it) },
+                        confirmPassword = formState.confirmPassword,
+                        onCPasswordChanged = { viewModel.onCPasswordUpdated(it) },
                         onSignInClick = viewModel::onSignInClicked,
                         onSignUpClick = viewModel::register,
                         onGoogleSignClick = { viewModel.onGoogleClicked(context) },
@@ -168,6 +185,10 @@ fun SignUpScreen(
                         onEmailChanged = { viewModel.onEmailUpdated(it) },
                         phoneNumber = formState.phoneNumber,
                         onPhoneChanged = { viewModel.onPhoneNumberUpdated(it) },
+                        password = formState.password,
+                        onPasswordChanged = { viewModel.onPasswordUpdated(it) },
+                        confirmPassword = formState.confirmPassword,
+                        onCPasswordChanged = { viewModel.onCPasswordUpdated(it) },
                         modifier = Modifier.fillMaxWidth(),
                         onSignInClick = viewModel::onSignInClicked,
                         onSignUpClick = viewModel::register,
@@ -217,15 +238,20 @@ private fun SignUpScreenForm(
     fullName: String,
     email: String,
     phoneNumber: String,
+    password: String,
+    confirmPassword: String,
     isSigningUp: Boolean,
     isSigningUpWithGoogle: Boolean,
     onNameChanged: (String) -> Unit,
     onEmailChanged: (String) -> Unit,
     onPhoneChanged: (String) -> Unit,
+    onPasswordChanged: (String) -> Unit,
+    onCPasswordChanged: (String) -> Unit,
     onSignInClick: () -> Unit,
     onSignUpClick: () -> Unit,
     onGoogleSignClick: () -> Unit
 ) {
+
     Column(
         modifier = modifier
     ) {
@@ -257,16 +283,37 @@ private fun SignUpScreenForm(
             hint = "Phone Number",
             leadingIcon = Icons.Default.Phone,
             keyboardOptions = KeyboardOptions(
-                imeAction = ImeAction.Done,
+                imeAction = ImeAction.Next,
                 keyboardType = KeyboardType.Phone
             )
+        )
+        ZonerSpacer(8.dp)
+        ZonerTextField(
+            value = password,
+            onValueChange = onPasswordChanged,
+            label = "Password",
+            hint = "Enter password",
+            leadingIcon = Icons.Default.Lock,
+            isInputSecret = true,
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next)
+        )
+        ZonerSpacer(8.dp)
+        ZonerTextField(
+            value = confirmPassword,
+            onValueChange = onCPasswordChanged,
+            label = "Confirm Password",
+            hint = "Enter password",
+            leadingIcon = Icons.Default.Lock,
+            isInputSecret = true,
+            isError = confirmPassword != password,
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done)
         )
         ZonerSpacer(16.dp)
         ZonerTextLink(
             text = "Already have an account? Login",
+            onClick = onSignInClick,
             modifier = Modifier
-                .align(Alignment.CenterHorizontally),
-            onClick = onSignInClick
+                .align(Alignment.CenterHorizontally)
         )
         ZonerSpacer(16.dp)
 

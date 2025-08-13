@@ -1,17 +1,14 @@
 package com.zoner.android.mediaplaybackmanager
 
 import android.content.Context
-import android.content.Intent
 import android.media.AudioAttributes
 import android.media.AudioFocusRequest
 import android.media.AudioManager
 import android.os.Build
 import android.os.SystemClock
 import android.view.KeyEvent
-import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 
-@UnstableApi
 object MediaPlaybackManager {
     private var currentlyPlaying: ExoPlayer? = null
     private lateinit var appContext: Context

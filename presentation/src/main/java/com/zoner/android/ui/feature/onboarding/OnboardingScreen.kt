@@ -42,8 +42,9 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import androidx.window.core.layout.WindowSizeClass
 import com.zoner.android.R
-import com.zoner.android.navigation.OnboardingRoute
-import com.zoner.android.navigation.SignUpRoute
+import com.zoner.android.ui.navigation.OnboardingRoute
+import com.zoner.android.ui.navigation.SignInRoute
+import com.zoner.android.ui.navigation.SignUpRoute
 import com.zoner.android.ui.designSystem.ZonerButton
 import com.zoner.android.util.DeviceConfiguration
 import kotlinx.coroutines.launch
@@ -57,13 +58,14 @@ fun OnboardingScreen(
 ) {
     val rootModifier = Modifier
         .fillMaxSize()
+        .background(MaterialTheme.colorScheme.background)
         .padding(32.dp)
 
     val deviceConfiguration = DeviceConfiguration.fromWindowSizeClass(windowSizeClass)
 
     val onFinished = {
         viewModel.setOnboardingCompleted()
-        navController.navigate(SignUpRoute) {
+        navController.navigate(SignInRoute) {
             popUpTo(OnboardingRoute) {
                 inclusive = true
             }
@@ -90,7 +92,7 @@ fun OnboardingScreen(
         DeviceConfiguration.TABLET_PORTRAIT,
         DeviceConfiguration.TABLET_LANDSCAPE,
         DeviceConfiguration.DESKTOP -> {
-            OnboardingScreenLarge(deviceConfiguration, onFinished)
+            OnboardingScreenLarge(rootModifier, deviceConfiguration, onFinished)
         }
     }
 }
@@ -98,11 +100,12 @@ fun OnboardingScreen(
 
 @Composable
 fun OnboardingScreenLarge(
+    modifier: Modifier = Modifier,
     deviceConfiguration: DeviceConfiguration,
     onFinished: () -> Unit
 ) {
     Box(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxSize()
     ) {
         Row(
@@ -174,7 +177,7 @@ fun OnboardingScreenContent(
     }
 
     Box(
-        modifier = modifier,
+        modifier = modifier
     ) {
         Column(
             modifier = Modifier.fillMaxSize(),
@@ -211,7 +214,8 @@ fun OnboardingScreenContent(
                     ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Rounded.ArrowForward,
-                            contentDescription = "Next"
+                            contentDescription = "Next",
+                            tint = MaterialTheme.colorScheme.onBackground
                         )
                     }
                 } else {

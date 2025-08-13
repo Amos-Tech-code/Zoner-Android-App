@@ -42,7 +42,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import androidx.window.core.layout.WindowSizeClass
-import com.zoner.android.navigation.CountrySelectRoute
+import com.zoner.android.ui.navigation.CountrySelectRoute
 import com.zoner.android.ui.designSystem.ZonerButton
 import com.zoner.android.ui.designSystem.ZonerDropdownSelector
 import com.zoner.android.ui.designSystem.ZonerSelectorTextField
