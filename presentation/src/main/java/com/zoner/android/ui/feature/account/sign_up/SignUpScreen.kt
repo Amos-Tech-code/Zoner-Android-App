@@ -1,6 +1,5 @@
 package com.zoner.android.ui.feature.account.sign_up
 
-import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.Image
@@ -26,25 +25,27 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -53,13 +54,15 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import androidx.window.core.layout.WindowSizeClass
 import com.zoner.android.R
-import com.zoner.android.ui.navigation.OTPVerificationRoute
-import com.zoner.android.ui.navigation.SignInRoute
+import com.zoner.android.ui.designSystem.ErrorAlertDialog
 import com.zoner.android.ui.designSystem.ZonerSpacer
 import com.zoner.android.ui.designSystem.ZonerTextField
 import com.zoner.android.ui.designSystem.ZonerTextLink
+import com.zoner.android.ui.navigation.CompleteProfileRoute
+import com.zoner.android.ui.navigation.OTPVerificationRoute
 import com.zoner.android.util.DeviceConfiguration
 import com.zoner.android.util.ObserveAsEvents
+import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
 
 @Composable
@@ -68,20 +71,36 @@ fun SignUpScreen(
     windowSizeClass: WindowSizeClass,
     viewModel: SignUpViewModel = koinViewModel()
 ) {
+    var showErrorDialog by remember { mutableStateOf(false) }
+    var showOauthErrorDialog by remember { mutableStateOf(false) }
+    var message by remember { mutableStateOf<String?>(null) }
+    val snackBarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
 
-    ObserveAsEvents(viewModel.event) {
-        when (it) {
-            is SignUpEvent.ShowErrorMessage -> {
-                Toast.makeText(navController.context, it.message, Toast.LENGTH_SHORT).show()
+    ObserveAsEvents(viewModel.event) { event ->
+        when (event) {
+            is SignUpEvent.ShowErrorDialog -> {
+                showErrorDialog = true
+                message = event.message
             }
-
             is SignUpEvent.NavigateToSignIn -> {
                 navController.popBackStack()
             }
 
-            SignUpEvent.NavigateToVerification -> {
-                navController.navigate(OTPVerificationRoute)
+            is SignUpEvent.NavigateToVerification -> {
+                navController.navigate(OTPVerificationRoute(event.userId))
             }
+
+            is SignUpEvent.NavigateToCompleteProfile -> {
+                navController.navigate(CompleteProfileRoute(event.userId))
+            }
+            is SignUpEvent.ShowSnackBar -> {
+                scope.launch {
+                    snackBarHostState.showSnackbar(event.message)
+                }
+            }
+
+            SignUpEvent.ShowOauthErrorDialog -> { showOauthErrorDialog = true }
         }
     }
 
@@ -92,8 +111,12 @@ fun SignUpScreen(
     val context = LocalContext.current as ComponentActivity
 
     Scaffold(
-        contentWindowInsets = WindowInsets.safeDrawing
-    ) { innerPadding ->
+        contentWindowInsets = WindowInsets.safeDrawing,
+        snackbarHost = {
+            SnackbarHost(snackBarHostState)
+        }
+    )
+    { innerPadding ->
 
         val rootModifier = Modifier
             .fillMaxSize()
@@ -201,6 +224,23 @@ fun SignUpScreen(
         }
     }
 
+    if (showErrorDialog) {
+        ErrorAlertDialog(
+            title = "Sign Up Failed",
+            message = message ?: "Something went wrong.",
+            onDismissRequest = { showErrorDialog = false },
+            onConfirmButtonClick = { showErrorDialog = false }
+        )
+    }
+    if (showOauthErrorDialog) {
+        ErrorAlertDialog(
+            title = viewModel.error,
+            message = viewModel.errorDescription,
+            onDismissRequest = { showOauthErrorDialog = false },
+            onConfirmButtonClick = { showOauthErrorDialog = false }
+        )
+    }
+
 }
 
 
@@ -252,6 +292,8 @@ private fun SignUpScreenForm(
     onGoogleSignClick: () -> Unit
 ) {
 
+    val keyboardController = LocalSoftwareKeyboardController.current
+
     Column(
         modifier = modifier
     ) {
@@ -275,18 +317,18 @@ private fun SignUpScreenForm(
                 keyboardType = KeyboardType.Email
             )
         )
-        ZonerSpacer(8.dp)
-        ZonerTextField(
-            value = phoneNumber,
-            onValueChange = onPhoneChanged,
-            label = "Phone Number",
-            hint = "Phone Number",
-            leadingIcon = Icons.Default.Phone,
-            keyboardOptions = KeyboardOptions(
-                imeAction = ImeAction.Next,
-                keyboardType = KeyboardType.Phone
-            )
-        )
+//        ZonerSpacer(8.dp)
+//        ZonerTextField(
+//            value = phoneNumber,
+//            onValueChange = onPhoneChanged,
+//            label = "Phone Number",
+//            hint = "Phone Number",
+//            leadingIcon = Icons.Default.Phone,
+//            keyboardOptions = KeyboardOptions(
+//                imeAction = ImeAction.Next,
+//                keyboardType = KeyboardType.Phone
+//            )
+//        )
         ZonerSpacer(8.dp)
         ZonerTextField(
             value = password,
@@ -318,14 +360,19 @@ private fun SignUpScreenForm(
         ZonerSpacer(16.dp)
 
         Button(
-            onClick = onSignUpClick,
-            enabled = !isSigningUp && !isSigningUpWithGoogle,
+            onClick = {
+                onSignUpClick()
+                keyboardController?.hide()
+            },
+            enabled = !isSigningUp && !isSigningUpWithGoogle && password == confirmPassword,
             shape = RoundedCornerShape(10.dp),
             colors = ButtonDefaults.buttonColors(
                 containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = MaterialTheme.colorScheme.onPrimary
             ),
-            modifier = Modifier.fillMaxWidth().height(50.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(50.dp),
         ) {
             AnimatedVisibility(
                 visible = isSigningUp
@@ -346,7 +393,9 @@ private fun SignUpScreenForm(
         ZonerSpacer(16.dp)
 
         SignInWithGoogle(
-            modifier =  Modifier.fillMaxWidth().height(50.dp),
+            modifier =  Modifier
+                .fillMaxWidth()
+                .height(50.dp),
             text = "SIGN UP WITH GOOGLE",
             onClick = onGoogleSignClick,
             isSigningUp = isSigningUp,

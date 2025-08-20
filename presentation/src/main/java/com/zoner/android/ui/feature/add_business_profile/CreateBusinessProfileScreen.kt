@@ -1,9 +1,10 @@
 package com.zoner.android.ui.feature.add_business_profile
 
-import android.widget.Toast
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
@@ -11,9 +12,11 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -21,20 +24,31 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -42,16 +56,18 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import androidx.window.core.layout.WindowSizeClass
-import com.zoner.android.ui.navigation.CountrySelectRoute
+import com.zoner.android.ui.designSystem.SuccessAlertDialog
 import com.zoner.android.ui.designSystem.ZonerButton
 import com.zoner.android.ui.designSystem.ZonerDropdownSelector
 import com.zoner.android.ui.designSystem.ZonerSelectorTextField
 import com.zoner.android.ui.designSystem.ZonerSpacer
 import com.zoner.android.ui.designSystem.ZonerTextField
 import com.zoner.android.ui.designSystem.ZonerTextLink
+import com.zoner.android.ui.navigation.CountrySelectRoute
 import com.zoner.android.util.DeviceConfiguration
 import com.zoner.android.util.ObserveAsEvents
 import com.zoner.domain.model.CountryModel
+import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -62,20 +78,38 @@ fun CreateBusinessProfileScreen(
     viewModel: CreateBusinessProfileViewModel = koinViewModel()
 ) {
 
+    var showSuccessDialog by remember { mutableStateOf(false) }
+    val snackBarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+
     ObserveAsEvents(viewModel.event) { event ->
         when (event) {
-            is CreateBusinessProfileEvent.ShowErrorMessage -> {
-                Toast.makeText(navController.context, event.message, Toast.LENGTH_SHORT).show()
+            is CreateBusinessProfileEvent.ShowErrorDialog -> {
+                scope.launch {
+                    snackBarHostState.showSnackbar(
+                        event.message,
+                        withDismissAction = true,
+                        duration = SnackbarDuration.Indefinite,
+                        actionLabel = "Dismiss",
+                    )
+                }
             }
 
             CreateBusinessProfileEvent.NavigateToCountrySelection -> {
                 navController.navigate(CountrySelectRoute)
             }
+
+            is CreateBusinessProfileEvent.ShowSnackBar -> {
+                scope.launch {
+                    snackBarHostState.showSnackbar(event.message)
+                }
+            }
+
+            CreateBusinessProfileEvent.ShowSuccessDialog -> { showSuccessDialog = true }
         }
     }
 
     val deviceConfiguration = DeviceConfiguration.fromWindowSizeClass(windowSizeClass)
-    val state by viewModel.state.collectAsStateWithLifecycle()
     val formState by viewModel.formState.collectAsStateWithLifecycle()
     val useThisCountry =
         navController.currentBackStackEntry?.savedStateHandle?.getStateFlow<CountryModel?>(
@@ -110,32 +144,61 @@ fun CreateBusinessProfileScreen(
                     }
                 }
             )
-        },
-    ) { innerPadding ->
-        ResponsiveFormWrapper(
-            modifier = Modifier.padding(innerPadding),
-            deviceConfig = deviceConfiguration
-        ) {
-            CreateBusinessForm(
-                name = formState.businessName,
-                category = formState.category,
-                location = formState.location,
-                selectedCountry = formState.selectedCountry,
-                phoneNumber = formState.phoneNumber,
-                description = formState.description,
-                isTermsAccepted = formState.isTermsAccepted,
-                onNameChange = { viewModel.onBusinessNameChange(it) },
-                onCategoryChange = { viewModel.onCategoryChange(it) },
-                onLocationChange = { viewModel.onLocationChange(it) },
-                onPhoneNumberChange = { viewModel.onPhoneNumberChange(it) },
-                onDescriptionChange = { viewModel.onDescriptionChange(it) },
-                onTermsChanged = { viewModel.onTermsAcceptedChange() },
-                onSelectCountryClicked = viewModel::onCountrySelectionClicked,
-                onTermsClicked = {},
-                onCreateAccount = viewModel::createBusinessAccount
-            )
         }
+    )
+    { innerPadding ->
 
+        Box(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
+
+            ResponsiveFormWrapper(
+                modifier = Modifier.fillMaxSize(),
+                deviceConfig = deviceConfiguration
+            ) {
+                CreateBusinessForm(
+                    isLoading = formState.isLoading,
+                    name = formState.businessName,
+                    category = formState.category,
+                    location = formState.location,
+                    selectedCountry = formState.selectedCountry,
+                    phoneNumber = formState.phoneNumber,
+                    description = formState.description,
+                    isTermsAccepted = formState.isTermsAccepted,
+                    onNameChange = { viewModel.onBusinessNameChange(it) },
+                    onCategoryChange = { viewModel.onCategoryChange(it) },
+                    onLocationChange = { viewModel.onLocationChange(it) },
+                    onPhoneNumberChange = { viewModel.onPhoneNumberChange(it) },
+                    onDescriptionChange = { viewModel.onDescriptionChange(it) },
+                    onTermsChanged = { viewModel.onTermsAcceptedChange() },
+                    onSelectCountryClicked = viewModel::onCountrySelectionClicked,
+                    onTermsClicked = {},
+                    onCreateAccount = viewModel::createBusinessAccount
+                )
+            }
+
+            // 👇 SnackBar at the TOP overlay
+            SnackbarHost(
+                hostState = snackBarHostState,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 16.dp)
+            )
+
+        }
+    }
+
+    if (showSuccessDialog) {
+        SuccessAlertDialog(
+            message = "Your business profile has been created successfully!" +
+                    " 🎉\nStart showcasing your services, deals, and updates with nearby customers now.",
+            onDismissRequest = {
+                showSuccessDialog = false
+                navController.navigateUp()
+            },
+            onConfirmButtonClick = {
+                showSuccessDialog = false
+                navController.navigateUp()
+            }
+        )
     }
 
 }
@@ -189,6 +252,7 @@ fun ResponsiveFormWrapper(
 @Composable
 private fun CreateBusinessForm(
     modifier: Modifier = Modifier,
+    isLoading: Boolean,
     name: String,
     category: String,
     location:  String,
@@ -206,6 +270,7 @@ private fun CreateBusinessForm(
     onTermsClicked: () -> Unit,
     onCreateAccount: () -> Unit
 ) {
+    val keyboardController = LocalSoftwareKeyboardController.current
     Column(
         modifier = modifier
     ) {
@@ -227,7 +292,7 @@ private fun CreateBusinessForm(
         ZonerDropdownSelector(
             label = "Location",
             selectedOption = location,
-            options = listOf("Nairobi", "Nyeri", "Muranga", "Kiambu"),
+            options = listOf("Nairobi", "Nyeri", "Murang'a", "Kiambu"),
             hint = "Select Location",
             onOptionSelected = onLocationChange
         )
@@ -301,8 +366,43 @@ private fun CreateBusinessForm(
         ZonerButton(
             text = "Create Business Account",
             onClick = onCreateAccount,
-            modifier = Modifier.align(Alignment.CenterHorizontally)
+            modifier = Modifier
         )
+        Button(
+            onClick = {
+                onCreateAccount()
+                keyboardController?.hide()
+            },
+            enabled = !isLoading,
+            shape = RoundedCornerShape(10.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary
+            ),
+            modifier = Modifier
+                .fillMaxWidth()
+                .align(Alignment.CenterHorizontally)
+                .height(50.dp),
+        ) {
+            AnimatedVisibility(
+                visible = isLoading
+            ) {
+                Row(horizontalArrangement = Arrangement.Center) {
+                    Text(text = "Creating Business Account...")
+                    ZonerSpacer(8.dp)
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(24.dp),
+                    )
+                }
+            }
+            AnimatedVisibility(
+                visible = !isLoading
+            ) {
+                Text(
+                    text = "Create Business Account",
+                )
+            }
+        }
 
     }
 }

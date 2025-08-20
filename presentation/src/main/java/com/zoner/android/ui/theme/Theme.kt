@@ -121,15 +121,26 @@ fun ZonerTheme(
         else -> LightColorScheme
     }
 
-    // Optional: Set system bar colors
+    // Set system bar colors
     val view = LocalView.current
     val context = LocalContext.current
     if (!view.isInEditMode) {
         SideEffect {
-            (context as? Activity)?.window?.statusBarColor = colorScheme.surface.toArgb()
-            ViewCompat.getWindowInsetsController(view)
-                ?.isAppearanceLightStatusBars = !darkTheme
+            (context as? Activity)?.window?.let { window ->
+                // Set status bar color
+                window.statusBarColor = colorScheme.surface.toArgb()
+
+                // Set navigation bar color
+                window.navigationBarColor = colorScheme.surface.toArgb()
+
+                val insetsController = ViewCompat.getWindowInsetsController(view)
+
+                // Control light/dark appearance for status & nav bars
+                insetsController?.isAppearanceLightStatusBars = !darkTheme
+                insetsController?.isAppearanceLightNavigationBars = !darkTheme
+            }
         }
+
     }
 
     MaterialTheme(

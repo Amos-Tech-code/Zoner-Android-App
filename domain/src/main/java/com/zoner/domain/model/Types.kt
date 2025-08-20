@@ -1,12 +1,19 @@
 package com.zoner.domain.model
 
 
-enum class MediaType {
-    IMAGE, VIDEO
+enum class RegistrationStage {
+    EMAIL_SUBMITTED,     // After signup, before verification
+    EMAIL_VERIFIED,      // After verification, before profile
+    PROFILE_COMPLETED   // Username/profile set
 }
 
-enum class UserType {
-    BUSINESS, PERSONAL , UNKNOWN
+enum class UserRole {
+    USER,               // Default (can only view posts)
+    BUSINESS           // Can post business content (verified or unverified)
+}
+
+enum class MediaType {
+    IMAGE, VIDEO
 }
 
 enum class PostType {

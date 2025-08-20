@@ -10,6 +10,7 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.zoner.domain.repository.StatusRepository
+import org.koin.java.KoinJavaComponent.getKoin
 import java.util.concurrent.TimeUnit
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.hours
@@ -18,14 +19,18 @@ import kotlin.time.ExperimentalTime
 class StatusCleanupWorker(
     context: Context,
     workerParams: WorkerParameters,
-    private val statusRepository: StatusRepository // Inject directly
+    private val statusRepository: StatusRepository? // Inject directly
 ) : CoroutineWorker(context, workerParams) {
+
+    private val repository: StatusRepository by lazy {
+        statusRepository ?: getKoin().get()
+    }
 
     @OptIn(ExperimentalTime::class)
     override suspend fun doWork(): Result {
         return try {
             val expiryTime = Clock.System.now().minus(24.hours).toEpochMilliseconds()
-            val expiredCount = statusRepository.getExpiredStatusCount(expiryTime)
+            val expiredCount = repository.getExpiredStatusCount(expiryTime)
 
             if (expiredCount == 0) {
                 Log.d("StatusCleanupWorker", "No expired statuses found - skipping cleanup")
@@ -34,7 +39,7 @@ class StatusCleanupWorker(
 
             Log.d("StatusCleanupWorker", "Found $expiredCount expired statuses - proceeding with cleanup")
 
-            val deletedCount = statusRepository.cleanExpiredStatuses()
+            val deletedCount = repository.cleanExpiredStatuses()
 
             Log.d("StatusCleanupWorker", "Successfully cleaned up $deletedCount expired statuses")
             Result.success()
@@ -45,7 +50,6 @@ class StatusCleanupWorker(
     }
 
     companion object {
-
         fun enqueue(context: Context) {
             val constraints = Constraints.Builder()
                 .setRequiredNetworkType(NetworkType.NOT_REQUIRED)
@@ -53,6 +57,8 @@ class StatusCleanupWorker(
                 .build()
 
             val request = PeriodicWorkRequestBuilder<StatusCleanupWorker>(
+//                15, TimeUnit.MINUTES, // Minimum interval
+//                5, TimeUnit.MINUTES   // Minimum flex
                 12, TimeUnit.HOURS, // More frequent checks (minimum interval)
                 3, TimeUnit.HOURS    // Flex interval
             )

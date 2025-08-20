@@ -1,6 +1,7 @@
 package com.zoner.android.ui.feature.profile
 
 import android.widget.Toast
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -8,6 +9,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -49,19 +51,26 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.zoner.android.ui.navigation.SettingsRoute
 import com.zoner.android.ui.designSystem.EmptyState
+import com.zoner.android.ui.designSystem.LoadingComponent
+import com.zoner.android.ui.designSystem.LoadingType
 import com.zoner.android.ui.designSystem.PostItem
 import com.zoner.android.ui.designSystem.ZonerAsyncImage
 import com.zoner.android.ui.designSystem.ZonerSpacer
+import com.zoner.android.ui.theme.ZonerInfo
 import com.zoner.android.util.ObserveAsEvents
 import com.zoner.android.util.formatShort
 import com.zoner.android.util.toRelativeTime
+import com.zoner.domain.model.LocalUser
 import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
 
@@ -86,88 +95,94 @@ fun ProfileScreen(
     val coroutineScope = rememberCoroutineScope()
     val tabTitles = if (state.isBusinessAccount) {
         listOf("Posts", "Replies", "Likes", "Bookmarks")
-    } else listOf("Likes", "Bookmarks")
+    } else listOf("Replies","Likes", "Bookmarks")
     val pagerState = rememberPagerState(pageCount = { tabTitles.size })
 
     Scaffold(
         topBar = {
             ProfileTopBar(
                 onSettingsClick = { navController.navigate(SettingsRoute) },
-                toggle = { viewModel.toggleAccountType() }
             )
         }
     ) { innerPadding ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-        ) {
-            item {
-                ProfileHeader(
-                    user = state.user,
-                    isBusinessAccount = state.isBusinessAccount,
-                    onEditClicked = {},
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
+        if (state.isLoading) {
+            LoadingComponent(
+                type = LoadingType.Circular,
+                isFullScreen = true
+            )
+        } else {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+            )
+            {
+                item {
+                    ProfileHeader(
+                        user = state.user,
+                        isBusinessAccount = state.isBusinessAccount,
+                        onEditClicked = {},
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
 
-            item {
-                Text(
-                    text = state.user.bio ?: "",
-                    modifier = Modifier.padding(16.dp),
-                    style = MaterialTheme.typography.bodyMedium
-                )
-            }
+                item {
+                    Text(
+                        text = /*state.user.bio*/ "",
+                        modifier = Modifier.padding(16.dp),
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
 
-            item {
-                ProfileStats(
-                    followers = state.user.followers,
-                    following = state.user.following,
-                    posts = state.user.posts,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                )
-            }
+                item {
+                    ProfileStats(
+                        followers = 0/*state.user.followers*/,
+                        following = 0/*state.user.following*/,
+                        posts = 0 /*state.user.posts*/,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
 
-            stickyHeader {
-                ScrollableTabRow(
-                    selectedTabIndex = pagerState.currentPage,
-                    edgePadding = 16.dp,
-                    indicator = { tabPositions ->
-                        SecondaryIndicator(
-                            modifier = Modifier.tabIndicatorOffset(tabPositions[pagerState.currentPage]),
-                            height = 3.dp,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    },
-                    divider = {}
-                ) {
-                    tabTitles.forEachIndexed { index, title ->
-                        Tab(
-                            selected = pagerState.currentPage == index,
-                            onClick = {
-                                coroutineScope.launch {
-                                    pagerState.animateScrollToPage(index)
-                                }
-                            },
-                            text = { Text(title) }
-                        )
+                stickyHeader {
+                    ScrollableTabRow(
+                        selectedTabIndex = pagerState.currentPage,
+                        edgePadding = 16.dp,
+                        indicator = { tabPositions ->
+                            SecondaryIndicator(
+                                modifier = Modifier.tabIndicatorOffset(tabPositions[pagerState.currentPage]),
+                                height = 3.dp,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        },
+                        divider = {}
+                    ) {
+                        tabTitles.forEachIndexed { index, title ->
+                            Tab(
+                                selected = pagerState.currentPage == index,
+                                onClick = {
+                                    coroutineScope.launch {
+                                        pagerState.animateScrollToPage(index)
+                                    }
+                                },
+                                text = { Text(title) }
+                            )
+                        }
                     }
                 }
-            }
 
-            item {
-                HorizontalPager(
-                    state = pagerState,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = 400.dp) // adjust based on your content
-                ) { page ->
-                    when (tabTitles[page]) {
-                        "Posts" -> PostList(posts = state.posts)
-                        "Replies" -> RepliesList(replies = state.replies)
-                        "Likes" -> LikesList(posts = state.likedPosts)
-                        "Bookmarks" -> BookmarksList(posts = state.bookmarkedPosts)
-                        else -> Box(modifier = Modifier.fillMaxSize())
+                item {
+                    HorizontalPager(
+                        state = pagerState,
+                        modifier = Modifier
+                            .fillMaxSize()
+                    ) { page ->
+                        when (tabTitles[page]) {
+                            "Posts" -> PostList(posts = state.posts)
+                            "Replies" -> RepliesList(replies = state.replies)
+                            "Likes" -> LikesList(posts = state.likedPosts)
+                            "Bookmarks" -> BookmarksList(posts = state.bookmarkedPosts)
+                            else -> Box(modifier = Modifier.fillMaxSize())
+                        }
                     }
                 }
             }
@@ -178,7 +193,7 @@ fun ProfileScreen(
 
 @Composable
 private fun ProfileHeader(
-    user: User,
+    user: LocalUser?,
     isBusinessAccount: Boolean,
     onEditClicked: () -> Unit,
     modifier: Modifier = Modifier
@@ -191,8 +206,8 @@ private fun ProfileHeader(
         if (isBusinessAccount) {
             Box(modifier = Modifier.fillMaxWidth()) {
                 ZonerAsyncImage(
-                    imageUrl = user.avatarUrl,
-                    contentDescription = "Profile picture",
+                    imageUrl = user?.businessLogo,
+                    contentDescription = "Business Profile picture",
                     contentScale = ContentScale.Crop,
                     modifier = Modifier
                         .fillMaxWidth()
@@ -203,6 +218,7 @@ private fun ProfileHeader(
                     .size(80.dp)
                     .offset(y = 20.dp)
                     .clip(CircleShape)
+                    .background(ZonerInfo, shape = CircleShape)
                     .border(
                         width = 4.dp,
                         shape = CircleShape,
@@ -211,36 +227,73 @@ private fun ProfileHeader(
                     .align(Alignment.BottomCenter),
                     contentAlignment = Alignment.Center
                 ) {
+                    user?.imgUrl?.let {
                     ZonerAsyncImage(
-                        imageUrl = user.avatarUrl,
+                        imageUrl = user.imgUrl,
                         contentDescription = "Profile picture",
                         contentScale = ContentScale.Crop,
-                        modifier = Modifier.align(Alignment.Center)
-                    )
+                        modifier = Modifier.fillMaxSize().align(Alignment.Center)
+                    ) } ?: run {
+                        user?.name?.first()?.uppercase()?.let {
+                            Text(
+                                text = it,
+                                fontSize = 24.sp,
+                                color = Color.White,
+                                minLines = 1,
+                                textAlign = TextAlign.Center,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
                 }
             }
         } else {
-            ZonerAsyncImage(
-                imageUrl = user.avatarUrl,
-                contentDescription = "Profile picture",
-                modifier = Modifier
-                    .size(80.dp)
-                    .clip(CircleShape)
-            )
+            user?.imgUrl?.let {
+                ZonerAsyncImage(
+                    imageUrl = it,
+                    contentDescription = "Profile picture",
+                    modifier = Modifier
+                        .size(80.dp)
+                        .clip(CircleShape)
+                )
+            } ?: run {
+                Box(
+                    modifier = Modifier
+                        .size(80.dp)
+                        .clip(CircleShape)
+                        .background(color = ZonerInfo, shape = CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    user?.name?.first()?.uppercase()?.let {
+                        Text(
+                            text = it,
+                            fontSize = 24.sp,
+                            color = Color.White,
+                            minLines = 1,
+                            textAlign = TextAlign.Center,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
         }
 
         ZonerSpacer(16.dp)
 
         Column {
-            Text(
-                text = user.name,
-                style = MaterialTheme.typography.titleLarge
-            )
-            Text(
-                text = "@${user.username}",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-            )
+            user?.name?.let {
+                Text(
+                    text = it,
+                    style = MaterialTheme.typography.titleLarge
+                )
+            }
+            user?.username?.let {
+                Text(
+                    text = it,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                )
+            }
 
             if (isBusinessAccount) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -320,7 +373,10 @@ private fun ProfileStats(
     posts: Int,
     modifier: Modifier = Modifier
 ) {
-    Row(modifier = modifier) {
+    Row(
+        modifier = modifier.padding(vertical = 8.dp),
+        horizontalArrangement = Arrangement.Center
+    ) {
         ProfileStatItem(count = posts, label = "Posts")
         Spacer(modifier = Modifier.width(16.dp))
         ProfileStatItem(count = followers, label = "Followers")
@@ -350,7 +406,6 @@ private fun ProfileStatItem(count: Int, label: String) {
 @Composable
 private fun ProfileTopBar(
     onSettingsClick: () -> Unit,
-    toggle: () -> Unit
 ) {
     TopAppBar(
         title = {
@@ -360,14 +415,6 @@ private fun ProfileTopBar(
             )
         },
         actions = {
-            IconButton(
-                onClick = toggle
-            ) {
-                Icon(
-                    imageVector = Icons.Default.ToggleOff,
-                    contentDescription = "settings"
-                )
-            }
             IconButton(
                 onClick = onSettingsClick
             ) {
@@ -384,19 +431,20 @@ private fun ProfileTopBar(
 
 @Composable
 private fun RepliesList(
-    replies: List<Reply>,
+    modifier: Modifier = Modifier,
+    replies: List<Reply>
 ) {
 
     if (replies.isEmpty()) {
         EmptyState(
             icon = Icons.Outlined.ChatBubbleOutline,
-            message = "No replies yet"
+            message = "No replies yet",
         )
     } else {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp)
+            modifier = modifier
+                .fillMaxSize()
+                .padding(vertical = 8.dp)
         ) {
             replies.forEach { reply ->
                 ReplyItem(
@@ -414,7 +462,8 @@ private fun RepliesList(
 
 @Composable
 private fun PostList(
-    posts: List<Post>,
+    modifier: Modifier = Modifier,
+    posts: List<Post>
 ) {
     if (posts.isEmpty()) {
         EmptyState(
@@ -423,9 +472,9 @@ private fun PostList(
         )
     } else {
         Column(
-            modifier = Modifier
+            modifier = modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp)
+                .padding(vertical = 8.dp)
         ) {
             posts.forEach { post ->
                 PostItem(
@@ -442,7 +491,8 @@ private fun PostList(
 
 @Composable
 private fun LikesList(
-    posts: List<Post>,
+    modifier: Modifier = Modifier,
+    posts: List<Post>
 ) {
     if (posts.isEmpty()) {
         EmptyState(
@@ -451,9 +501,9 @@ private fun LikesList(
         )
     } else {
         Column(
-            modifier = Modifier
+            modifier = modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp)
+                .padding(vertical = 8.dp)
         ) {
             posts.forEach { post ->
                 PostItem(
@@ -470,7 +520,8 @@ private fun LikesList(
 
 @Composable
 private fun BookmarksList(
-    posts: List<Post>,
+    modifier: Modifier = Modifier,
+    posts: List<Post>
 ) {
     if (posts.isEmpty()) {
         EmptyState(
@@ -479,9 +530,9 @@ private fun BookmarksList(
         )
     } else {
         Column(
-            modifier = Modifier
+            modifier = modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp)
+                .padding(vertical = 8.dp)
         ) {
             posts.forEach { post ->
                 PostItem(
@@ -496,7 +547,6 @@ private fun BookmarksList(
     }
 }
 
-
 @Composable
 private fun ReplyItem(
     reply: Reply,
@@ -507,7 +557,7 @@ private fun ReplyItem(
         modifier = modifier
             .fillMaxWidth()
             .clickable { onReplyClick(reply.postId) }
-            .padding(16.dp)
+            .padding(horizontal = 16.dp, vertical = 8.dp)
     ) {
         Row(verticalAlignment = Alignment.Top) {
             // Reply author avatar

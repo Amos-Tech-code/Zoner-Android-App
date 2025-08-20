@@ -1,7 +1,9 @@
 package com.zoner.android.ui.feature.view_status
 
+import android.widget.Toast
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -10,19 +12,23 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -43,138 +49,261 @@ import com.zoner.android.ui.designSystem.LoadingType
 import com.zoner.android.ui.designSystem.StatusVideoPlayer
 import com.zoner.android.ui.designSystem.ZonerAsyncImage
 import com.zoner.android.util.ObserveAsEvents
+import com.zoner.android.util.toRelativeTime
 import com.zoner.domain.model.MediaType
+import com.zoner.domain.model.StatusGroup
+import com.zoner.domain.model.UserStatus
 import org.koin.androidx.compose.koinViewModel
+import kotlin.time.ExperimentalTime
 
 @Composable
 fun StatusViewerScreen(
     navController: NavController,
-    viewModel: StatusViewerViewModel = koinViewModel(),
+    viewModel: StatusViewerViewModel = koinViewModel()
 ) {
     val state by viewModel.viewingState.collectAsStateWithLifecycle()
 
     ObserveAsEvents(viewModel.event) { event ->
         when (event) {
             StatusViewingEvents.NavigateBack -> navController.navigateUp()
+            is StatusViewingEvents.ShowError -> {
+                navController.navigateUp()
+                Toast.makeText(navController.context, event.message, Toast.LENGTH_SHORT).show()
+            }
         }
     }
 
     Scaffold { innerPadding ->
-        Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
-            if (state.isLoading) {
-                LoadingComponent(
-                    type = LoadingType.Circular,
-                    isFullScreen = true
+        StatusViewerContent(
+            state = state,
+            onNext = viewModel::moveToNextStatus,
+            onPrevious = viewModel::moveToPreviousStatus,
+            onClose = viewModel::closeViewer,
+            onProgressChanged = viewModel::onProgressChanged,
+            modifier = Modifier.fillMaxSize().padding(innerPadding)
+        )
+    }
+}
+
+@Composable
+private fun StatusViewerContent(
+    state: StatusViewingState,
+    onNext: () -> Unit,
+    onPrevious: () -> Unit,
+    onClose: () -> Unit,
+    onProgressChanged: (Float) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val currentStatus = state.statuses.getOrNull(state.currentIndex)
+    var isPressed by remember { mutableStateOf(false) }
+
+    Box(modifier = modifier.fillMaxSize().background(Color.Black)) {
+        if (state.isLoading) {
+            LoadingComponent(
+                type = LoadingType.Circular,
+                isFullScreen = true,
+                modifier = Modifier.align(Alignment.Center)
+            )
+        } else if (currentStatus != null) {
+            StatusMediaContent(
+                status = currentStatus,
+                isPaused = state.paused || isPressed,
+                onProgressChanged = onProgressChanged,
+                onMediaEnded = onNext
+            )
+
+            state.statusGroup?.let {
+                StatusViewHeader(
+                    statusGroup = it,
+                    currentIndex = state.currentIndex,
+                    progress = state.progressForCurrent,
+                    onClose = onClose,
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
                 )
-            } else {
-                val current = state.statuses.getOrNull(state.currentIndex)
-                val animatable = remember { Animatable(0f) }
-                var isPressed by remember { mutableStateOf(false) }
+            }
 
-                // Handle animation for both image and video
-                LaunchedEffect(current, state.paused, isPressed) {
-                    if (current == null) return@LaunchedEffect
+            StatusNavigationHandler(
+                onNext = onNext,
+                onPrevious = onPrevious,
+                onPress = { isPressed = it }
+            )
+        }
+    }
+}
 
-                    animatable.stop()
+@Composable
+private fun StatusMediaContent(
+    status: UserStatus,
+    isPaused: Boolean,
+    onProgressChanged: (Float) -> Unit,
+    onMediaEnded: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    when (status.mediaType) {
+        MediaType.IMAGE -> {
+            StatusImageViewer(
+                status = status,
+                isPaused = isPaused,
+                onProgressChanged = onProgressChanged,
+                onAnimationFinished = onMediaEnded,
+                modifier = modifier
+            )
+        }
+        MediaType.VIDEO -> {
+            StatusVideoPlayer(
+                uri = status.mediaUri,
+                paused = isPaused,
+                onProgress = onProgressChanged,
+                onEnded = onMediaEnded,
+                modifier = modifier
+            )
+        }
+    }
+}
 
-                    if (!state.paused && !isPressed) {
-                        val remainingTime = when (current.mediaType) {
-                            MediaType.IMAGE -> (current.durationMillis ?: 5000L) * (1f - state.progressForCurrent)
-                            MediaType.VIDEO -> 0L // Video handles its own progress
-                        }
+@Composable
+private fun StatusImageViewer(
+    status: UserStatus,
+    isPaused: Boolean,
+    onProgressChanged: (Float) -> Unit,
+    onAnimationFinished: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val animatable = remember { Animatable(0f) }
 
-                        if (current.mediaType == MediaType.IMAGE) {
-                            animatable.snapTo(state.progressForCurrent)
-                            animatable.animateTo(
-                                1f,
-                                animationSpec = tween(
-                                    durationMillis = remainingTime.toInt(),
-                                    easing = LinearEasing
-                                )
-                            ) {
-                                viewModel.onProgressChanged(value)
-                                if (value >= 1f) {
-                                    viewModel.onImageAnimationFinished()
-                                }
-                            }
-                        }
-                    }
+    LaunchedEffect(status, isPaused) {
+        animatable.stop()
+
+        if (!isPaused) {
+            val remainingTime = status.durationMillis * (1f - animatable.value)
+            animatable.animateTo(
+                1f,
+                animationSpec = tween(
+                    durationMillis = remainingTime.toInt(),
+                    easing = LinearEasing
+                )
+            ) {
+                onProgressChanged(value)
+                if (value >= 1f) {
+                    onAnimationFinished()
                 }
+            }
+        }
+    }
 
-                Box(Modifier.fillMaxSize().background(Color.Black)) {
-                    if (current != null) {
-                        when (current.mediaType) {
-                            MediaType.IMAGE -> {
-                                ZonerAsyncImage(
-                                    imageUrl = current.mediaUri,
-                                    contentDescription = null,
-                                    modifier = Modifier.fillMaxSize(),
-                                    contentScale = ContentScale.Crop
-                                )
-                            }
-                            MediaType.VIDEO -> {
-                                StatusVideoPlayer(
-                                    uri = current.mediaUri,
-                                    paused = state.paused || isPressed,
-                                    onProgress = viewModel::onVideoProgress,
-                                    onEnded = viewModel::onVideoEnded
-                                )
-                            }
-                        }
+    ZonerAsyncImage(
+        imageUrl = status.mediaUri,
+        contentDescription = null,
+        modifier = modifier.fillMaxSize(),
+        contentScale = ContentScale.Crop
+    )
+}
+
+@OptIn(ExperimentalTime::class)
+@Composable
+private fun StatusViewHeader(
+    statusGroup: StatusGroup,
+    currentIndex: Int,
+    progress: Float,
+    onClose: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val currentStatus = statusGroup.statuses.getOrNull(currentIndex)
+
+    Column(
+        modifier = modifier.fillMaxWidth()
+            .background(Color.Black.copy(0.4f))
+            .padding(horizontal = 8.dp)
+            .height(70.dp)
+    ) {
+        StatusProgressBars(
+            total = statusGroup.statuses.size,
+            currentIndex = currentIndex,
+            progress = progress,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp)
+        )
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(
+                onClick = onClose,
+                modifier = Modifier.size(28.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Default.ArrowBack,
+                    contentDescription = "Back",
+                    tint = Color.White
+                )
+            }
+            Spacer(modifier = Modifier.width(16.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                ZonerAsyncImage(
+                    imageUrl = "https://picsum.photos/200/200",
+                    contentDescription = "User avatar",
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(CircleShape),
+                )
+
+                Spacer(modifier = Modifier.width(16.dp))
+                Column {
+                    statusGroup.authorName?.let {
+                        Text(
+                            text = it,
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = Color.White,
+                        )
                     }
-
-                    StatusProgressBars(
-                        total = state.statuses.size,
-                        currentIndex = state.currentIndex,
-                        progress = state.progressForCurrent,
-                        modifier = Modifier
-                            .align(Alignment.TopCenter)
-                            .padding(top = 16.dp)
-                    )
-
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .pointerInput(Unit) {
-                                detectTapGestures(
-                                    onPress = {
-                                        isPressed = true
-                                        viewModel.togglePause(true)
-                                        tryAwaitRelease()
-                                        isPressed = false
-                                        viewModel.togglePause(false)
-                                    },
-                                    onTap = { offset ->
-                                        val screenWidth = size.width
-                                        when {
-                                            // Left 1/3 - previous status
-                                            offset.x < screenWidth / 3 -> {
-                                                viewModel.moveToPreviousStatus()
-                                            }
-                                            // Right 1/3 - next status
-                                            offset.x > screenWidth * 2f / 3 -> {
-                                                viewModel.moveToNextStatus()
-                                            }
-                                            // Middle 1/3
-                                        }
-                                    }
-                                )
-                            }
-                    )
-
-                    IconButton(
-                        onClick = { viewModel.closeViewer() },
-                        modifier = Modifier
-                            .align(Alignment.TopStart)
-                            .padding(12.dp)
-                            .background(Color.Black.copy(alpha = 0.4f), CircleShape)
-                    ) {
-                        Icon(Icons.Default.Close, contentDescription = null, tint = Color.White)
+                    currentStatus?.let {
+                        Text(
+                            text = "${it.createdAt.toRelativeTime()} ago",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color.White.copy(alpha = 0.8f)
+                        )
                     }
                 }
             }
         }
     }
+}
+
+@Composable
+private fun StatusNavigationHandler(
+    onNext: () -> Unit,
+    onPrevious: () -> Unit,
+    onPress: (Boolean) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .pointerInput(Unit) {
+                detectTapGestures(
+                    onPress = {
+                        onPress(true)
+                        tryAwaitRelease()
+                        onPress(false)
+                    },
+                    onTap = { offset ->
+                        val screenWidth = size.width
+                        when {
+                            offset.x < screenWidth / 3 -> onPrevious()
+                            offset.x > screenWidth * 2f / 3 -> onNext()
+                        }
+                    }
+                )
+            }
+    )
 }
 
 
@@ -198,7 +327,7 @@ private fun StatusProgressBars(
                     index == currentIndex -> progress
                     else -> 0f
                 },
-                animationSpec = tween(durationMillis = 100, easing = LinearEasing),
+                animationSpec = tween(durationMillis = 100, easing = LinearOutSlowInEasing),
                 label = "progress_animation"
             )
 

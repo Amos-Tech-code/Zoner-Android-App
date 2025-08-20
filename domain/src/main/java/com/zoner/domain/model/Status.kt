@@ -14,38 +14,28 @@ import kotlin.time.Instant
 data class StatusGroup(
     val authorId: String,
     val authorName: String?,
-    val statuses: List<UserStatus>
+    val authorAvatar: String?,
+    val statuses: List<UserStatus>,
+    val updatedAt: Long? = null
 )
 
 
 @OptIn(ExperimentalTime::class)
 data class UserStatus(
     val id: String,
+    val userId: String,  // Add this field
+    val userName: String?,  // Add this field
+    val userAvatar: String?,  // Add this field
     val mediaUri: Uri,
     val caption: String,
     val mediaType: MediaType,
     val createdAt: Instant,
     val state: StatusState,
-    val durationMillis: Long? = null,
+    val durationMillis: Long = if (mediaType == MediaType.IMAGE) 5000 else 0L,
     val uploadTime: Instant? = null,
     val localFilePath: String? = null,
     val isViewed: Boolean = false
-) {
-    fun getDisplayUri(context: Context): Uri {
-        return if (state == StatusState.Uploaded && mediaUri.scheme == "http") {
-            mediaUri // Remote URI
-        } else {
-            // For local content URIs, ensure we have permissions
-            localFilePath?.let { path ->
-                FileProvider.getUriForFile(
-                    context,
-                    "${context.packageName}.provider",
-                    File(path)
-                )
-            } ?: mediaUri
-        }
-    }
-}
+)
 
 // Extensions to check expired status
 @OptIn(ExperimentalTime::class)

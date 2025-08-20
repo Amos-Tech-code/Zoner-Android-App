@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.QuestionAnswer
 import androidx.compose.material.icons.filled.Report
 import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -31,21 +32,40 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.DialogProperties
 import androidx.navigation.NavController
+import com.zoner.android.ui.designSystem.LogoutConfirmDialog
 import com.zoner.android.ui.designSystem.ZonerSpacer
+import com.zoner.android.ui.navigation.MainAppRoute
+import com.zoner.android.ui.navigation.SignInRoute
+import com.zoner.android.util.ObserveAsEvents
 import org.koin.androidx.compose.koinViewModel
 
 @Composable
 fun SettingsScreen(
     navController: NavController,
-    settingsViewModel: SettingsViewModel = koinViewModel()
+    viewModel: SettingsViewModel = koinViewModel()
 ) {
+
+    ObserveAsEvents(viewModel.event) { event ->
+        when (event) {
+            SettingsEvent.LogOut -> {
+                navController.navigate(SignInRoute) {
+                    popUpTo(MainAppRoute) { inclusive = true }
+                }
+            }
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -56,7 +76,7 @@ fun SettingsScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding),
-            onLogOutClick = { }
+            onLogOutClick = { viewModel.logOut() }
         )
 
     }
@@ -94,6 +114,8 @@ fun SettingsScreenContent(
     modifier: Modifier = Modifier,
     onLogOutClick: () -> Unit
 ) {
+    var showLogoutDialog by remember { mutableStateOf(false) }
+
     LazyColumn(modifier = modifier) {
         item { SectionTitle("ACCOUNT") }
         item { SettingsItem("Edit Profile", Icons.Default.Person, onItemClick = {}) }
@@ -117,11 +139,21 @@ fun SettingsScreenContent(
         item {
             Box(modifier = Modifier.fillMaxWidth()) {
                 SignOutButton(
-                    onClick = onLogOutClick,
+                    onClick = { showLogoutDialog = true },
                     modifier = Modifier.align(Alignment.Center)
                 )
             }
         }
+    }
+
+    if (showLogoutDialog) {
+        LogoutConfirmDialog(
+            onConfirm = {
+                showLogoutDialog = false
+                onLogOutClick() // call VM logout
+            },
+            onDismiss = { showLogoutDialog = false }
+        )
     }
 }
 

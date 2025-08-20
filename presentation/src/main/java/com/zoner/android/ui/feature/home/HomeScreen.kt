@@ -67,6 +67,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -87,7 +88,9 @@ import com.zoner.android.ui.navigation.StatusViewRoute
 import com.zoner.android.ui.theme.ZonerInfo
 import com.zoner.android.util.ObserveAsEvents
 import com.zoner.domain.StatusState
+import com.zoner.domain.model.LocalUser
 import com.zoner.domain.model.MediaType
+import com.zoner.domain.model.StatusGroup
 import com.zoner.domain.model.UserStatus
 import org.koin.androidx.compose.koinViewModel
 import kotlin.math.min
@@ -117,6 +120,7 @@ fun HomeScreen(
                 userStatus = (state as? HomeState.Success)?.userStatusItems ?: emptyList(),
                 otherStatus = (state as? HomeState.Success)?.otherStatus ?: emptyList(),
                 isBusinessAccount = (state as? HomeState.Success)?.isBusinessAccount ?: false,
+                user = viewModel.loggedInUser,
                 isLoading = isLoading,
                 onAddPostClick = onNavigateToAddPost,
                 onAddStatusClick = onNavigateToAddStatus,
@@ -218,6 +222,7 @@ private fun HomeScreenTopBar(
     userStatus: List<UserStatus>,
     isBusinessAccount: Boolean,
     isLoading: Boolean,
+    user: LocalUser?,
     onAddPostClick: () -> Unit,
     onStatusClicked: (Status) -> Unit,
     onMyStatusClick: (List<UserStatus>) -> Unit,
@@ -228,7 +233,7 @@ private fun HomeScreenTopBar(
         expandedHeight = TopAppBarDefaults.LargeAppBarExpandedHeight,
         title = {
             Column(modifier = Modifier.fillMaxWidth()) {
-                HomeScreenHeader(onAddPostClick, modifier = Modifier.fillMaxWidth())
+                HomeScreenHeader(onAddPostClick, user, modifier = Modifier.fillMaxWidth())
                 if (isLoading) {
                     LoadingComponent(
                         type = LoadingType.Wave,
@@ -258,6 +263,7 @@ private fun HomeScreenTopBar(
 @Composable
 private fun HomeScreenHeader(
     onAddPostClick: () -> Unit,
+    user: LocalUser?,
     modifier: Modifier = Modifier
 ) {
     Row(
@@ -275,20 +281,24 @@ private fun HomeScreenHeader(
             contentAlignment = Alignment.Center
         ) {
             // Use this if you have a profile picture
-            ZonerAsyncImage(
-                imageUrl = "https://picsum.photos/200/200",
-                contentDescription = "Profile picture",
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize()
-            )
-//                Text(
-//                    text = "AK",
-//                    fontSize = 14.sp,
-//                    color = Color.White,
-//                    minLines = 1,
-//                    textAlign = TextAlign.Center,
-//                    fontWeight = FontWeight.Bold
-//                )
+            user?.imgUrl?.let {
+                ZonerAsyncImage(
+                    imageUrl = user.imgUrl,
+                    contentDescription = "Profile picture",
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize().align(Alignment.Center)
+                ) } ?: run {
+                user?.name?.first()?.uppercase()?.let {
+                    Text(
+                        text = it,
+                        fontSize = 14.sp,
+                        color = Color.White,
+                        minLines = 1,
+                        textAlign = TextAlign.Center,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
         }
         Image(
             painter = painterResource(R.drawable.ic_logo),
@@ -553,7 +563,10 @@ private fun UStatusItem(
 
         Text(
             text = "My Status",
-            style = MaterialTheme.typography.labelSmall,
+            style = MaterialTheme.typography.labelSmall.copy(
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 11.sp
+            ),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )

@@ -49,6 +49,9 @@ data class UserStatusEntity(
     fun toDomain(): UserStatus {
         return UserStatus(
             id = id,
+            userId = "my_status_0",
+            userName = "My Status",
+            userAvatar = null,
             mediaUri = mediaUri.toUri(),
             caption = caption,
             mediaType = mediaTypeOrDefault(mediaType),

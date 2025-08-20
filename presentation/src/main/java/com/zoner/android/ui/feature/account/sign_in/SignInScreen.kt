@@ -1,6 +1,5 @@
 package com.zoner.android.ui.feature.account.sign_in
 
-import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.Image
@@ -29,15 +28,21 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -46,17 +51,18 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import androidx.window.core.layout.WindowSizeClass
 import com.zoner.android.R
-import com.zoner.android.ui.navigation.MainAppRoute
-import com.zoner.android.ui.navigation.OTPVerificationRoute
-import com.zoner.android.ui.navigation.ResetPasswordRoute
-import com.zoner.android.ui.navigation.SignInRoute
-import com.zoner.android.ui.navigation.SignUpRoute
+import com.zoner.android.ui.designSystem.ErrorAlertDialog
 import com.zoner.android.ui.designSystem.ZonerSpacer
 import com.zoner.android.ui.designSystem.ZonerTextField
 import com.zoner.android.ui.designSystem.ZonerTextLink
 import com.zoner.android.ui.feature.account.sign_up.SignInWithGoogle
+import com.zoner.android.ui.navigation.MainAppRoute
+import com.zoner.android.ui.navigation.ResetPasswordRoute
+import com.zoner.android.ui.navigation.SignInRoute
+import com.zoner.android.ui.navigation.SignUpRoute
 import com.zoner.android.util.DeviceConfiguration
 import com.zoner.android.util.ObserveAsEvents
+import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
 
 @Composable
@@ -66,10 +72,17 @@ fun SignInScreen(
     viewModel: SignInViewModel = koinViewModel()
 ) {
 
-    ObserveAsEvents(viewModel.event) {
-        when (it) {
-            is SignInEvent.ShowErrorMessage -> {
-                Toast.makeText(navController.context, it.message, Toast.LENGTH_SHORT).show()
+    var showErrorDialog by remember { mutableStateOf(false) }
+    var showOauthErrorDialog by remember { mutableStateOf(false) }
+    var message by remember { mutableStateOf<String?>(null) }
+    val snackBarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+
+    ObserveAsEvents(viewModel.event) { event ->
+        when (event) {
+            is SignInEvent.ShowErrorDialog -> {
+                showErrorDialog = true
+                message = event.message
             }
 
             SignInEvent.NavigateToHome -> {
@@ -86,6 +99,16 @@ fun SignInScreen(
 
             SignInEvent.NavigateToResetPassword -> {
                 navController.navigate(ResetPasswordRoute)
+            }
+
+            is SignInEvent.ShowSnackBar -> {
+                scope.launch {
+                    snackBarHostState.showSnackbar(event.message)
+                }
+            }
+
+            SignInEvent.ShowOauthErrorDialog -> {
+                showOauthErrorDialog = true
             }
         }
     }
@@ -109,8 +132,10 @@ fun SignInScreen(
 //    }
 
     Scaffold(
-        contentWindowInsets = WindowInsets.safeDrawing
-    ) { innerPadding ->
+        contentWindowInsets = WindowInsets.safeDrawing,
+        snackbarHost = { SnackbarHost(snackBarHostState) }
+    )
+    { innerPadding ->
 
         val rootModifier = Modifier
             .fillMaxSize()
@@ -178,6 +203,23 @@ fun SignInScreen(
 
     }
 
+    if (showErrorDialog) {
+        ErrorAlertDialog(
+            title = "Sign In Failed",
+            message = message ?: "Something went wrong.",
+            onDismissRequest = { showErrorDialog = false },
+            onConfirmButtonClick = { showErrorDialog = false }
+        )
+    }
+    if (showOauthErrorDialog) {
+        ErrorAlertDialog(
+            title = viewModel.error,
+            message = viewModel.errorDescription,
+            onDismissRequest = { showOauthErrorDialog = false },
+            onConfirmButtonClick = { showOauthErrorDialog = false }
+        )
+    }
+
 }
 
 
@@ -226,6 +268,8 @@ private fun SignInScreenForm(
     onGoogleSignInClicked: () -> Unit,
     onForgotPasswordClicked: () -> Unit
 ) {
+    val keyboardController = LocalSoftwareKeyboardController.current
+
     Column(
         modifier = modifier
     ) {
@@ -253,7 +297,9 @@ private fun SignInScreenForm(
         ZonerSpacer(8.dp)
         ZonerTextLink(
             text = "Forgot Password?",
-            modifier = Modifier.align(Alignment.Start).padding(horizontal = 16.dp),
+            modifier = Modifier
+                .align(Alignment.Start)
+                .padding(horizontal = 16.dp),
             onClick = onForgotPasswordClicked
         )
         ZonerSpacer(24.dp)
@@ -264,7 +310,10 @@ private fun SignInScreenForm(
         )
         ZonerSpacer(16.dp)
         Button(
-            onClick = onSignInClicked,
+            onClick = {
+                onSignInClicked()
+                keyboardController?.hide()
+            },
             enabled = !isSigningIn && !isSigningInWithGoogle,
             shape = RoundedCornerShape(10.dp),
             colors = ButtonDefaults.buttonColors(

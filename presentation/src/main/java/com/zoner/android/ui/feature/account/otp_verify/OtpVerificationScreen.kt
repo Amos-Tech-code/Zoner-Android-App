@@ -27,19 +27,28 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Backspace
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -54,45 +63,66 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import androidx.window.core.layout.WindowSizeClass
 import com.zoner.android.R
-import com.zoner.android.ui.navigation.MainAppRoute
+import com.zoner.android.ui.designSystem.ErrorAlertDialog
 import com.zoner.android.ui.navigation.SignInRoute
 import com.zoner.android.ui.designSystem.ZonerSpacer
+import com.zoner.android.ui.feature.account.reset_password.ResetPasswordScreenState
+import com.zoner.android.ui.navigation.CompleteProfileRoute
+import com.zoner.android.ui.navigation.OTPVerificationRoute
+import com.zoner.android.ui.navigation.SignUpRoute
 import com.zoner.android.util.DeviceConfiguration
 import com.zoner.android.util.ObserveAsEvents
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun OtpVerificationScreen(
     navController: NavController,
     windowSizeClass: WindowSizeClass,
+    userId: String? = null,
     viewModel: OtpVerificationViewModel = koinViewModel()
 ) {
-
-    ObserveAsEvents(viewModel.event) { event ->
-        when(event) {
-            is OtpVerificationEvent.ShowErrorMessage -> {
-                Toast.makeText(navController.context, event.message, Toast.LENGTH_SHORT).show()
-
-            }
-
-            OtpVerificationEvent.NavigateToHome-> {
-                navController.navigate(MainAppRoute) {
-                    popUpTo(SignInRoute) {
-                        inclusive = true
-                    }
-                }
-            }
-        }
-    }
 
     val state by viewModel.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val activity = context as? Activity
+    val snackBarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+    var showErrorDialog by remember { mutableStateOf(false) }
+    var message by remember { mutableStateOf<String?>(null) }
+
+    ObserveAsEvents(viewModel.event) { event ->
+        when(event) {
+            is OtpVerificationEvent.ShowErrorDialog -> {
+                message = event.message
+                showErrorDialog = true
+            }
+
+            is OtpVerificationEvent.NavigateToCompleteProfile-> {
+                navController.navigate(CompleteProfileRoute(userId = event.userId))
+            }
+
+            OtpVerificationEvent.NavigateToSignUp -> {
+                navController.navigate(SignInRoute) {
+                    popUpTo<OTPVerificationRoute> { inclusive = true }
+                }
+            }
+
+            is OtpVerificationEvent.ShowSnackBar -> {
+                scope.launch { snackBarHostState.showSnackbar(event.message) }
+            }
+        }
+    }
 
     BackHandler(enabled = !state.isLoading) {
         activity?.moveTaskToBack(true)
 
+    }
+
+    LaunchedEffect(userId) {
+        viewModel.initUserId(userId)
     }
 
     LaunchedEffect(state.otp) {
@@ -102,8 +132,27 @@ fun OtpVerificationScreen(
     }
 
     Scaffold(
-        contentWindowInsets = WindowInsets.safeDrawing
-    ) { innerPadding ->
+        contentWindowInsets = WindowInsets.safeDrawing,
+        topBar = {
+            TopAppBar(
+                navigationIcon = {
+                    IconButton(onClick = { navController.navigate(SignUpRoute) }
+                    ) { Icon(
+                            imageVector = Icons.AutoMirrored.Default.ArrowBack,
+                            contentDescription = "Go back")
+                    }
+                },
+                title = {},
+                colors = TopAppBarDefaults.topAppBarColors().copy(
+                    containerColor = MaterialTheme.colorScheme.background
+                )
+            )
+        },
+        snackbarHost = {
+            SnackbarHost(snackBarHostState)
+        }
+    )
+    { innerPadding ->
 
         val rootModifier = Modifier
             .fillMaxSize()
@@ -204,6 +253,14 @@ fun OtpVerificationScreen(
         }
     }
 
+    if (showErrorDialog) {
+        ErrorAlertDialog(
+            title = "OTP Verification Failed",
+            message = message ?: "Something went wrong.",
+            onDismissRequest = { showErrorDialog = false },
+            onConfirmButtonClick = { showErrorDialog = false }
+        )
+    }
 }
 
 @Composable
@@ -450,7 +507,7 @@ private fun OtpScreenHeader(
         Text(text = "OTP VERIFICATION", style = MaterialTheme.typography.titleLarge)
         ZonerSpacer(4.dp)
         Text(
-            text = "Enter OTP sent to the mobile number you entered.",
+            text = "Enter OTP sent to the email you entered.",
             style = MaterialTheme.typography.labelLarge
         )
 
@@ -463,6 +520,10 @@ fun OtpVerificationForm(
     state: OtpVerificationUIState,
     viewModel: OtpVerificationViewModel
 ) {
+    val minutes = (state.resendCountdown / 1000) / 60
+    val seconds = (state.resendCountdown / 1000) % 60
+    val formattedTime = String.format("%02d:%02d", minutes, seconds)
+
     Column(
         modifier = modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally
@@ -507,24 +568,38 @@ fun OtpVerificationForm(
 
         Button(
             onClick = { viewModel.resendOtp() },
-            enabled = !state.isResending && !state.isLoading,
+            enabled = !state.isResending && !state.isLoading && state.resendCountdown <=0 ,
             shape = RoundedCornerShape(10.dp),
             colors = ButtonDefaults.buttonColors(
                 containerColor = MaterialTheme.colorScheme.onSurface,
-                contentColor = MaterialTheme.colorScheme.background
+                contentColor = MaterialTheme.colorScheme.background,
+                disabledContainerColor = MaterialTheme.colorScheme.onSurface.copy(0.8f),
+                disabledContentColor = MaterialTheme.colorScheme.background,
             ),
             modifier = Modifier
                 .fillMaxWidth()
                 .height(50.dp)
         ) {
             AnimatedVisibility(visible = state.isResending) {
-                CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                CircularProgressIndicator(
+                    modifier = Modifier.size(24.dp),
+                )
             }
             AnimatedVisibility(visible = !state.isResending) {
-                Text(
-                    text = "RESEND CODE (${state.resendCountdown} secs)",
-                    style = MaterialTheme.typography.bodyMedium
-                )
+                when {
+                    state.resendCountdown > 0 -> {
+                        Text(
+                            text = "RESEND CODE IN ($formattedTime)",
+                            style = MaterialTheme.typography.labelLarge
+                        )
+                    }
+                    else -> {
+                        Text(
+                            text = "RESEND CODE",
+                            style = MaterialTheme.typography.labelLarge
+                        )
+                    }
+                }
             }
         }
     }

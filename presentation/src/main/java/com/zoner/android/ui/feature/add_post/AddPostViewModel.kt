@@ -8,8 +8,10 @@ import com.zoner.android.util.MAX_POST_MEDIA
 import com.zoner.android.util.MAX_STATUS_MEDIA
 import com.zoner.android.util.isImage
 import com.zoner.android.util.isVideo
+import com.zoner.data.local.datastore.ZonerSession
 import com.zoner.domain.StatusState
 import com.zoner.domain.model.Audience
+import com.zoner.domain.model.LocalUser
 import com.zoner.domain.model.MediaType
 import com.zoner.domain.model.PostType
 import com.zoner.domain.model.UserStatus
@@ -27,15 +29,35 @@ import kotlin.time.ExperimentalTime
 
 class AddPostViewModel(
     private val statusItemsUseCases: StatusItemsUseCases,
+    private val session: ZonerSession,
     private val context: Context
 ) : ViewModel() {
 
     private val _state = MutableStateFlow<AddPostState>(AddPostState.Nothing)
     val state: StateFlow<AddPostState> = _state
-
     private val _event = Channel<AddPostEvent>()
     val event = _event.receiveAsFlow()
 
+    var loggedInUser: LocalUser? = null
+
+    init {
+        observeUserFromLocal()
+    }
+    private fun observeUserFromLocal() {
+        viewModelScope.launch {
+            session.getUser().collect { user ->
+                if (user != null) {
+                   loggedInUser = user
+                    when(user.isBusiness) {
+                        true -> _state.value = AddPostState.Nothing
+                        false -> _state.value = AddPostState.AccountRequired
+                    }
+                } else {
+                    _state.value = AddPostState.AccountRequired
+                }
+            }
+        }
+    }
     private val _postType = MutableStateFlow(PostType.POST)
     val postType = _postType.asStateFlow()
 
@@ -234,7 +256,10 @@ class AddPostViewModel(
                                 mediaType = mediaType,
                                 caption = status.caption,
                                 createdAt = currentTime,
-                                state = StatusState.Pending
+                                state = StatusState.Pending,
+                                userId = "",
+                                userName = "",
+                                userAvatar = "",
                             )
 
                             statusItemsUseCases.saveUserStatus(userStatus)

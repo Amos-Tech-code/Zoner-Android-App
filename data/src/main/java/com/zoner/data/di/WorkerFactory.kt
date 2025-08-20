@@ -1,6 +1,7 @@
 package com.zoner.data.di
 
 import android.content.Context
+import android.util.Log
 import androidx.work.ListenableWorker
 import androidx.work.WorkerFactory
 import androidx.work.WorkerParameters
@@ -16,12 +17,19 @@ class KoinWorkerFactory(
         workerClassName: String,
         workerParameters: WorkerParameters
     ): ListenableWorker? {
-        //Log.d("KoinWorkerFactory", "Creating worker: $workerClassName")
-        return when (workerClassName) {
-            StatusCleanupWorker::class.java.name -> {
-                StatusCleanupWorker(appContext, workerParameters, statusRepository)
+        Log.d("KoinWorkerFactory", "Creating worker: $workerClassName")
+        return try {
+            when (workerClassName) {
+                StatusCleanupWorker::class.java.name -> {
+                    StatusCleanupWorker(appContext, workerParameters, statusRepository).also {
+                        Log.d("KoinWorkerFactory", "Worker created successfully")
+                    }
+                }
+                else -> null
             }
-            else -> null
+        } catch (e: Exception) {
+            Log.e("KoinWorkerFactory", "Error creating worker", e)
+            null // Let WorkManager try the default factory
         }
     }
 }

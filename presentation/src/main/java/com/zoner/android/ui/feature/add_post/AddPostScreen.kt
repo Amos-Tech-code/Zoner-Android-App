@@ -64,6 +64,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -91,13 +92,13 @@ import com.zoner.android.ui.designSystem.FullScreenVideoPlayer
 import com.zoner.android.ui.designSystem.VideoThumbnail
 import com.zoner.android.ui.designSystem.ZonerAsyncImage
 import com.zoner.android.ui.designSystem.ZonerSpacer
-import com.zoner.android.ui.feature.profile.User
 import com.zoner.android.ui.theme.ZonerInfo
 import com.zoner.android.util.MAX_POST_MEDIA
 import com.zoner.android.util.MAX_STATUS_MEDIA
 import com.zoner.android.util.ObserveAsEvents
 import com.zoner.android.util.isVideoUri
 import com.zoner.domain.model.Audience
+import com.zoner.domain.model.LocalUser
 import com.zoner.domain.model.PostType
 import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
@@ -114,7 +115,6 @@ fun AddPostScreen(
     val postDataForm by viewModel.postFormState.collectAsStateWithLifecycle()
     val statusDataForm by viewModel.statusFormState.collectAsStateWithLifecycle()
     val postType by viewModel.postType.collectAsStateWithLifecycle()
-    var showAccountRequiredDialog by remember { mutableStateOf(true) }
     val snackBarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val maxSelectableMedia = remember(postType) {
@@ -195,20 +195,23 @@ fun AddPostScreen(
         }
     }
 
-    BackHandler(enabled = state !is AddPostState.Nothing && state !is AddPostState.AccountRequired) {
-        viewModel.updateUIState(AddPostState.Nothing)
+    BackHandler {
+        when (state) {
+            AddPostState.AccountRequired -> navigateUp()
+            AddPostState.CaptionPost -> { viewModel.updateUIState(AddPostState.Nothing) }
+            AddPostState.Nothing -> navigateUp()
+            is AddPostState.PlayVideo -> { viewModel.updateUIState(AddPostState.Nothing) }
+            AddPostState.PreviewPost -> { viewModel.updateUIState(AddPostState.CaptionPost) }
+            AddPostState.ShowCamera -> { viewModel.updateUIState(AddPostState.Nothing) }
+        }
     }
 
     when (state) {
         is AddPostState.AccountRequired -> {
             AccountRequiredDialog(
-                showDialog = showAccountRequiredDialog,
-                onDismissRequest = {
-                    showAccountRequiredDialog = false
-                    navController.navigate(MainAppRoute)
-                },
+                showDialog = true,
+                onDismissRequest = { navigateUp() },
                 onConfirmButtonClick = {
-                    showAccountRequiredDialog = false
                     navController.navigate(CreateBusinessRoute)
                 }
             )
@@ -239,6 +242,7 @@ fun AddPostScreen(
 
         is AddPostState.Nothing -> {
             CreatePostScreen(
+                user = viewModel.loggedInUser,
                 onProceedToCaption = { viewModel.updateUIState(AddPostState.CaptionPost) },
                 onShareStatus = { viewModel.saveStatusesLocally() },
                 selectedMedia = if (postType == PostType.POST) postDataForm.uris else statusDataForm.data.map { it.media },
@@ -399,6 +403,7 @@ private fun CreatePostScreen(
     onOpenGallery: () -> Unit,
     onOpenMultiple: () -> Unit,
     onVideoPlayClicked: (Uri) -> Unit,
+    user: LocalUser?,
     modifier: Modifier = Modifier
 ) {
     var showAdvancedOptions by remember { mutableStateOf(false) }
@@ -409,7 +414,8 @@ private fun CreatePostScreen(
         topBar = {
             CreatePostTopBar(
                 postType = postType,
-                scrollBehavior = scrollBehavior
+                scrollBehavior = scrollBehavior,
+                user = user
             )
         },
         bottomBar = {
@@ -511,6 +517,7 @@ private fun CreatePostScreen(
 @Composable
 private fun CreatePostTopBar(
     postType: PostType,
+    user: LocalUser?,
     scrollBehavior: TopAppBarScrollBehavior
 ) {
     CenterAlignedTopAppBar(
@@ -526,20 +533,25 @@ private fun CreatePostTopBar(
                 contentAlignment = Alignment.Center
             ) {
                 // Use this if you have a profile picture
-                ZonerAsyncImage(
-                    imageUrl = "https://picsum.photos/200/200",
-                    contentDescription = "Profile picture",
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
-                )
-//                Text(
-//                    text = "AK",
-//                    fontSize = 14.sp,
-//                    color = Color.White,
-//                    minLines = 1,
-//                    textAlign = TextAlign.Center,
-//                    fontWeight = FontWeight.Bold
-//                )
+                user?.imgUrl?.let {
+                    ZonerAsyncImage(
+                        imageUrl = it,
+                        contentDescription = "Profile picture",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } ?: run {
+                    user?.name?.first()?.uppercase()?.let {
+                        Text(
+                            text = it,
+                            fontSize = 14.sp,
+                            color = Color.White,
+                            minLines = 1,
+                            textAlign = TextAlign.Center,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
             }
         },
         scrollBehavior = scrollBehavior

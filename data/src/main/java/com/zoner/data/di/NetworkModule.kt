@@ -17,9 +17,10 @@ import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import java.util.concurrent.TimeUnit
 
-const val BASE_URL = "https://zooner.onrender.com/api/"
+const val BASE_URL = "https://zoner-server.onrender.com/"
 
 val networkModule = module {
+
 
     // Single instance of OkHttpClient
     single {
@@ -41,6 +42,9 @@ val networkModule = module {
             .build()
     }
 
+    // Auth Interceptor
+    single{ AuthInterceptor(get()) }
+
     // Single instance of ApiService
     single<ApiService> {
         Retrofit.Builder()
@@ -53,7 +57,7 @@ val networkModule = module {
 
     // Single instance of NetworkService
     single<NetworkService> {
-        NetworkServiceImpl(get(), get())
+        NetworkServiceImpl(get(), get(), get())
     }
     // Single instance of Connectivity Observer
     single<ConnectivityObserver> { ConnectivityObserverImpl(get()) }

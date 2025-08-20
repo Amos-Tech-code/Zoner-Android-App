@@ -9,12 +9,14 @@ import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.toRoute
 import androidx.window.core.layout.WindowSizeClass
 import com.zoner.android.ui.feature.account.otp_verify.OtpVerificationScreen
 import com.zoner.android.ui.feature.account.reset_password.ResetPasswordScreen
 import com.zoner.android.ui.feature.account.sign_in.SignInScreen
 import com.zoner.android.ui.feature.account.sign_up.SignUpScreen
 import com.zoner.android.ui.feature.add_business_profile.CreateBusinessProfileScreen
+import com.zoner.android.ui.feature.account.complete_profile.CompleteProfileScreen
 import com.zoner.android.ui.feature.country_selection.CountrySelectionScreen
 import com.zoner.android.ui.feature.onboarding.OnboardingScreen
 import com.zoner.android.ui.feature.post_details.PostDetailsScreen
@@ -32,7 +34,7 @@ fun AppNavGraph(
     NavHost(
         navController = navController,
         modifier = modifier,
-        startDestination = MainAppRoute,
+        startDestination = startDestination,
         enterTransition = {
             slideIntoContainer(
                 towards = AnimatedContentTransitionScope.SlideDirection.Left,
@@ -71,16 +73,23 @@ fun AppNavGraph(
             SignUpScreen(navController, windowSizeClass)
         }
 
+
+        composable<OTPVerificationRoute> { backStackEntry ->
+            val route = backStackEntry.toRoute<OTPVerificationRoute>()
+            OtpVerificationScreen(navController, windowSizeClass, route.userId)
+        }
+
+        composable<CompleteProfileRoute> { backStackEntry ->
+            val route = backStackEntry.toRoute<CompleteProfileRoute>()
+            CompleteProfileScreen(navController, route.userId)
+        }
+
         composable<ResetPasswordRoute> {
             ResetPasswordScreen(navController, windowSizeClass)
         }
 
         composable<CountrySelectRoute> {
             CountrySelectionScreen(navController, windowSizeClass)
-        }
-
-        composable<OTPVerificationRoute> {
-            OtpVerificationScreen(navController, windowSizeClass)
         }
 
         // Main app container with persistent navigation

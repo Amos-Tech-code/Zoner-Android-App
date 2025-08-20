@@ -3,22 +3,19 @@ package com.zoner.android.ui.feature.onboarding
 import androidx.annotation.DrawableRes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.zoner.domain.usecase.OnboardingUseCases
+import com.zoner.data.local.datastore.ZonerSession
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
 
 class OnboardingViewModel(
-    private val onboardingUseCases: OnboardingUseCases
+    private val session: ZonerSession
 ) : ViewModel() {
 
     fun setOnboardingCompleted() {
         viewModelScope.launch {
-            onboardingUseCases.setOnboardingCompleted()
+            session.setOnboardingCompleted()
         }
     }
-
-    fun getOnboardingState(): Flow<Boolean> =
-        onboardingUseCases.getOnboardingCompleted()
 
 }
 

@@ -6,17 +6,21 @@ import com.zoner.android.ui.feature.profile.Media
 import com.zoner.android.ui.feature.profile.Post
 import com.zoner.android.ui.feature.profile.User
 import com.zoner.android.ui.feature.view_status.StatusViewingState
+import com.zoner.data.local.datastore.ZonerSession
+import com.zoner.domain.model.LocalUser
 import com.zoner.domain.model.MediaType
-import com.zoner.domain.model.UserStatus
+import com.zoner.domain.model.UserRole
 import com.zoner.domain.usecase.StatusItemsUseCases
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 class HomeViewModel(
-   private val statusUseCase: StatusItemsUseCases
+   private val statusUseCase: StatusItemsUseCases,
+   private val session: ZonerSession
 ): ViewModel() {
 
     private val _uiState = MutableStateFlow<HomeState>(HomeState.Loading)
@@ -29,19 +33,31 @@ class HomeViewModel(
    private val _event = Channel<HomeEvent>()
    val event = _event.receiveAsFlow()
 
+   var loggedInUser: LocalUser? = null
+
     init {
+       observeUserFromLocal()
        loadStatuses()
     }
 
+   private fun observeUserFromLocal() {
+      viewModelScope.launch {
+         session.getUser().collect { user ->
+            if (user != null) {
+               loggedInUser = user
+            }
+         }
+      }
+   }
    private fun loadStatuses() {
       _uiState.value = HomeState.Loading
       viewModelScope.launch {
          try {
              val result = statusUseCase.getUserStatus.invoke()
-            result.collect { statuses ->
+            result.collect { group ->
                _uiState.value = HomeState.Success(
                   isBusinessAccount = true,
-                  userStatusItems = statuses,
+                  userStatusItems = group.flatMap { it.statuses },
                   otherStatus = getDummyStatus(),
                   posts = getDummyPosts()
                )
@@ -51,41 +67,6 @@ class HomeViewModel(
             _uiState.value = HomeState.Error("Failed to retrieve posts. Please try again later.")
          }
       }
-   }
-
-   fun startViewingStatuses(statusGroup: List<UserStatus>, initialIndex: Int = 0) {
-      _viewingState.value = StatusViewingState(
-         statuses = statusGroup,
-         currentIndex = initialIndex,
-         isViewingOwnStatus = /*statusGroup.firstOrNull()?.author?.isCurrentUser ?:*/ true
-      )
-   }
-
-   fun moveToNextStatus() {
-      _viewingState.value?.let { current ->
-         if (current.currentIndex < current.statuses.size - 1) {
-            _viewingState.value = current.copy(
-               currentIndex = current.currentIndex + 1,
-            )
-         } else {
-            // Reached end, close viewer
-            _viewingState.value = null
-         }
-      }
-   }
-
-   fun moveToPreviousStatus() {
-      _viewingState.value?.let { current ->
-         if (current.currentIndex > 0) {
-            _viewingState.value = current.copy(
-               currentIndex = current.currentIndex - 1
-            )
-         }
-      }
-   }
-
-   fun closeStatusViewer() {
-      _viewingState.value = null
    }
 
     // Dummy Data Generators

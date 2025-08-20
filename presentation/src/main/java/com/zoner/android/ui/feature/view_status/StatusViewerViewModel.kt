@@ -14,7 +14,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 class StatusViewerViewModel(
-    private val repo: StatusRepository,
+    private val repository: StatusRepository,
 ) : ViewModel() {
 
     private val _viewingState = MutableStateFlow(StatusViewingState())
@@ -23,85 +23,62 @@ class StatusViewerViewModel(
     private val _event = Channel<StatusViewingEvents>()
     val event = _event.receiveAsFlow()
 
-    private var groups: List<StatusGroup> = emptyList()
+    private var statusGroups: List<StatusGroup> = emptyList()
     private var currentGroupIndex = 0
 
     init {
-        loadStatuses()
+        loadStatusGroups()
     }
 
-    private fun loadStatuses() {
+    private fun loadStatusGroups() {
         _viewingState.update { it.copy(isLoading = true) }
         viewModelScope.launch {
             try {
-                repo.getUserStatuses().collect { statuses ->
-                    if (statuses.isNotEmpty()) {
-                        startViewingGroups(
-                            listOf(
-                                StatusGroup(
-                                    authorId = "0_my_status",
-                                    authorName = "My Status",
-                                    statuses = statuses
-                                )
-                            )
-                        )
+                repository.getStatusGroups().collect { groups ->
+                    if (groups.isNotEmpty()) {
+                        statusGroups = groups
+                        startViewingGroup(0)
                     } else {
-                        closeViewer()
+                        _event.send(StatusViewingEvents.ShowError("Failed to load statuses"))
                     }
                 }
             } catch (e: Exception) {
-                closeViewer()
+                _event.send(StatusViewingEvents.ShowError("Failed to load statuses"))
+            } finally {
                 _viewingState.update { it.copy(isLoading = false) }
             }
         }
     }
 
-    private fun startViewingGroups(
-        statusGroups: List<StatusGroup>,
-        startGroupIndex: Int = 0,
-        startStatusIndex: Int = 0
-    ) {
-        groups = statusGroups
-        currentGroupIndex = startGroupIndex.coerceIn(0, groups.lastIndex)
-        startViewingStatuses(groups[currentGroupIndex].statuses, startStatusIndex)
-    }
-
-    private fun startViewingStatuses(statusGroup: List<UserStatus>, initialIndex: Int = 0) {
-        _viewingState.value = StatusViewingState(
-            statuses = statusGroup,
-            currentIndex = initialIndex,
-            isViewingOwnStatus = false,
-            paused = false,
-            progressForCurrent = 0f,
-            isLoading = false
-        )
+    private fun startViewingGroup(groupIndex: Int, statusIndex: Int = 0) {
+        currentGroupIndex = groupIndex.coerceIn(0, statusGroups.lastIndex)
+        val group = statusGroups[currentGroupIndex]
+        _viewingState.update {
+            StatusViewingState(
+                statusGroup = group,
+                statuses = group.statuses,
+                currentIndex = statusIndex,
+                isViewingOwnStatus = group.authorId == getCurrentUserId()
+            )
+        }
     }
 
     fun onProgressChanged(progress: Float) {
         _viewingState.update { it.copy(progressForCurrent = progress) }
     }
 
-    fun onImageAnimationFinished() {
-        moveToNextStatus()
-    }
-
-    fun onVideoProgress(progress: Float) {
-        onProgressChanged(progress)
-    }
-
-    fun onVideoEnded() {
-        moveToNextStatus()
-    }
-
     fun moveToNextStatus() {
         val state = _viewingState.value
         val nextIndex = state.currentIndex + 1
+
         if (nextIndex < state.statuses.size) {
             markStatusViewed(state.currentIndex)
-            _viewingState.value = state.copy(
-                currentIndex = nextIndex,
-                progressForCurrent = 0f
-            )
+            _viewingState.update {
+                it.copy(
+                    currentIndex = nextIndex,
+                    progressForCurrent = 0f
+                )
+            }
         } else {
             moveToNextGroup()
         }
@@ -110,20 +87,22 @@ class StatusViewerViewModel(
     fun moveToPreviousStatus() {
         val state = _viewingState.value
         val prevIndex = state.currentIndex - 1
+
         if (prevIndex >= 0) {
-            _viewingState.value = state.copy(
-                currentIndex = prevIndex,
-                progressForCurrent = 0f
-            )
+            _viewingState.update {
+                it.copy(
+                    currentIndex = prevIndex,
+                    progressForCurrent = 0f
+                )
+            }
         } else {
             moveToPreviousGroup()
         }
     }
 
     private fun moveToNextGroup() {
-        if (currentGroupIndex < groups.lastIndex) {
-            currentGroupIndex++
-            startViewingStatuses(groups[currentGroupIndex].statuses, 0)
+        if (currentGroupIndex < statusGroups.lastIndex) {
+            startViewingGroup(currentGroupIndex + 1)
         } else {
             closeViewer()
         }
@@ -131,9 +110,8 @@ class StatusViewerViewModel(
 
     private fun moveToPreviousGroup() {
         if (currentGroupIndex > 0) {
-            currentGroupIndex--
-            val lastIndex = groups[currentGroupIndex].statuses.lastIndex
-            startViewingStatuses(groups[currentGroupIndex].statuses, lastIndex)
+            val lastIndex = statusGroups[currentGroupIndex - 1].statuses.lastIndex
+            startViewingGroup(currentGroupIndex - 1, lastIndex)
         }
     }
 
@@ -142,11 +120,10 @@ class StatusViewerViewModel(
     }
 
     private fun markStatusViewed(index: Int) {
-        val state = _viewingState.value
-        val status = state.statuses[index]
+        val status = _viewingState.value.statuses.getOrNull(index) ?: return
         if (!status.isViewed) {
             viewModelScope.launch {
-                repo.markStatusAsViewed(status.id)
+                repository.markStatusAsViewed(status.id)
             }
         }
     }
@@ -156,4 +133,10 @@ class StatusViewerViewModel(
             _event.send(StatusViewingEvents.NavigateBack)
         }
     }
+
+    private fun getCurrentUserId(): String {
+        // Implement your current user ID retrieval
+        return ""
+    }
+
 }

@@ -20,23 +20,22 @@ object ResetPasswordRoute : NavRoutes
 object CountrySelectRoute : NavRoutes
 
 @Serializable
-object OTPVerificationRoute : NavRoutes
+data class OTPVerificationRoute(val userId: String? = null) : NavRoutes
+
+@Serializable
+data class CompleteProfileRoute(val userId: String? = null) : NavRoutes
 
 @Serializable
 object MainAppRoute : NavRoutes
 
 @Serializable
 object HomeRoute : NavRoutes
-
 @Serializable
 object SearchRoute : NavRoutes
-
 @Serializable
 object AddPostRoute : NavRoutes
-
 @Serializable
 object NotificationRoute : NavRoutes
-
 @Serializable
 object ProfileRoute : NavRoutes
 

@@ -4,11 +4,13 @@ sealed class ResetPasswordState {
     data object Nothing : ResetPasswordState()
     data object Loading : ResetPasswordState()
     data object Success : ResetPasswordState()
-    data class Error(val message: String) : ResetPasswordState()
+    data object Error : ResetPasswordState()
 }
 
 sealed class ResetPasswordScreenState {
     data object ForgotPassword : ResetPasswordScreenState()
-
-    data object ResetPassword : ResetPasswordScreenState()
+    data class ResetPassword(
+        val resendCountdown: Int = 0,
+        val isResending: Boolean = false
+    ) : ResetPasswordScreenState()
 }

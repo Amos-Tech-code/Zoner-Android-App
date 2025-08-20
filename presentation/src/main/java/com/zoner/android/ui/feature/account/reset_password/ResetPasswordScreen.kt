@@ -34,6 +34,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -41,12 +44,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
@@ -58,7 +64,9 @@ import com.zoner.android.ui.designSystem.ZonerSpacer
 import com.zoner.android.ui.designSystem.ZonerTextField
 import com.zoner.android.util.DeviceConfiguration
 import com.zoner.android.util.ObserveAsEvents
+import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
+import kotlin.time.Duration
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -67,11 +75,19 @@ fun ResetPasswordScreen(
     windowSizeClass: WindowSizeClass,
     viewModel: ResetPasswordViewModel = koinViewModel()
 ) {
+    val snackBarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
 
     ObserveAsEvents(viewModel.event) { event ->
         when (event) {
-            is ResetPasswordEvent.ShowErrorMessage -> {
-                Toast.makeText(navController.context, event.message, Toast.LENGTH_SHORT).show()
+            is ResetPasswordEvent.ShowErrorDialog -> {
+                scope.launch {
+                    snackBarHostState.showSnackbar(
+                        event.message,
+                        withDismissAction = true,
+                        duration = SnackbarDuration.Indefinite
+                    )
+                }
             }
 
             ResetPasswordEvent.NavigateToSignIn -> {
@@ -79,6 +95,12 @@ fun ResetPasswordScreen(
                     popUpTo(ResetPasswordRoute) {
                         inclusive = true
                     }
+                }
+            }
+
+            is ResetPasswordEvent.ShowSnackBar -> {
+                scope.launch {
+                    snackBarHostState.showSnackbar(event.message)
                 }
             }
         }
@@ -94,8 +116,8 @@ fun ResetPasswordScreen(
 
     BackHandler {
         when (screenState) {
-            ResetPasswordScreenState.ForgotPassword -> { navController.navigateUp() }
-            ResetPasswordScreenState.ResetPassword -> { viewModel.navigateToForgotPassword() }
+            is ResetPasswordScreenState.ForgotPassword -> { navController.navigateUp() }
+            is ResetPasswordScreenState.ResetPassword -> { viewModel.navigateToForgotPassword() }
         }
     }
     Scaffold(
@@ -107,7 +129,7 @@ fun ResetPasswordScreen(
                         onClick = {
                             when (screenState) {
                                 ResetPasswordScreenState.ForgotPassword -> { navController.navigateUp() }
-                                ResetPasswordScreenState.ResetPassword -> { viewModel.navigateToForgotPassword() }
+                                is ResetPasswordScreenState.ResetPassword -> { viewModel.navigateToForgotPassword() }
                             }
                         }
                     ) {
@@ -122,6 +144,9 @@ fun ResetPasswordScreen(
                     containerColor = MaterialTheme.colorScheme.background
                 )
             )
+        },
+        snackbarHost = {
+            SnackbarHost(hostState = snackBarHostState)
         }
     ) { innerPadding ->
 
@@ -144,7 +169,7 @@ fun ResetPasswordScreen(
                 )
             }
 
-            ResetPasswordScreenState.ResetPassword -> {
+            is ResetPasswordScreenState.ResetPassword -> {
                 val deviceConfiguration = DeviceConfiguration.fromWindowSizeClass(windowSizeClass)
 
                 when (deviceConfiguration) {
@@ -153,7 +178,6 @@ fun ResetPasswordScreen(
 
                         Column(
                             modifier = rootModifier,
-                            verticalArrangement = Arrangement.Center
                         ) {
                             ResetPasswordScreenHeader(
                                 modifier = Modifier
@@ -166,10 +190,12 @@ fun ResetPasswordScreen(
                                 otp = otp,
                                 onOtpChange = { viewModel.onOtpUpdated(it) },
                                 isLoading = isLoading,
+                                resendCountdown = (screenState as ResetPasswordScreenState.ResetPassword).resendCountdown,
                                 onEmailChange = { viewModel.onEmailUpdated(it) },
                                 onNewPasswordChange = { viewModel.onNewPasswordUpdated(it) },
                                 onCNewPasswordChange = { viewModel.onConfirmNewPasswordUpdated(it) },
                                 onResetPassword = viewModel::resetPassword,
+                                onResendOtp = viewModel::resendOtp,
                                 modifier = Modifier.fillMaxWidth()
                             )
                         }
@@ -194,6 +220,8 @@ fun ResetPasswordScreen(
                                 otp = otp,
                                 onOtpChange = { viewModel.onOtpUpdated(it) },
                                 isLoading = isLoading,
+                                resendCountdown = (screenState as ResetPasswordScreenState.ResetPassword).resendCountdown,
+                                onResendOtp = viewModel::resendOtp,
                                 onEmailChange = { viewModel.onEmailUpdated(it) },
                                 onNewPasswordChange = { viewModel.onNewPasswordUpdated(it) },
                                 onCNewPasswordChange = { viewModel.onConfirmNewPasswordUpdated(it) },
@@ -222,8 +250,12 @@ private fun ResetPasswordForm(
     onEmailChange: (String) -> Unit,
     onNewPasswordChange: (String) -> Unit,
     onCNewPasswordChange : (String) -> Unit,
-    onResetPassword : () -> Unit
+    onResetPassword : () -> Unit,
+    resendCountdown: Int = 0,
+    onResendOtp: () -> Unit
 ) {
+    val keyboardController = LocalSoftwareKeyboardController.current
+
     Column(modifier = modifier) {
         ZonerSpacer(8.dp)
         ZonerTextField(
@@ -236,18 +268,6 @@ private fun ResetPasswordForm(
             keyboardOptions = KeyboardOptions(
                 imeAction = ImeAction.Next,
                 keyboardType = KeyboardType.Email
-            )
-        )
-        ZonerSpacer(8.dp)
-        ZonerTextField(
-            value = otp,
-            onValueChange = onOtpChange,
-            label = "Otp",
-            hint = "Enter code sent to your email",
-            leadingIcon = Icons.Default.ConfirmationNumber,
-            keyboardOptions = KeyboardOptions(
-                imeAction = ImeAction.Done,
-                keyboardType = KeyboardType.Number
             )
         )
         ZonerSpacer(8.dp)
@@ -273,9 +293,53 @@ private fun ResetPasswordForm(
             isError = password != confirmPassword,
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next)
         )
+        ZonerSpacer(8.dp)
+        ZonerTextField(
+            value = otp,
+            onValueChange = onOtpChange,
+            label = "Otp",
+            hint = "Enter code sent to your email",
+            leadingIcon = Icons.Default.ConfirmationNumber,
+            keyboardOptions = KeyboardOptions(
+                imeAction = ImeAction.Done,
+                keyboardType = KeyboardType.Number
+            )
+        )
         ZonerSpacer(16.dp)
+
+        if (resendCountdown > 0) {
+            val minutes = resendCountdown / 60
+            val seconds = resendCountdown % 60
+            Text(
+                text = "Resend code available in %02d:%02d".format(minutes, seconds),
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onBackground,
+                textAlign = TextAlign.Center
+            )
+        } else {
+            Button(
+                onClick = onResendOtp,
+                enabled = !isLoading,
+                shape = RoundedCornerShape(10.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(50.dp),
+            ) {
+                Text("RESEND CODE")
+            }
+        }
+
+        ZonerSpacer(16.dp)
+
         Button(
-            onClick = onResetPassword,
+            onClick = {
+                onResetPassword()
+                keyboardController?.hide()
+            },
             enabled = !isLoading && password == confirmPassword,
             shape = RoundedCornerShape(10.dp),
             colors = ButtonDefaults.buttonColors(
@@ -297,7 +361,7 @@ private fun ResetPasswordForm(
                 visible = !isLoading
             ) {
                 Text(
-                    text = "Reset Password",
+                    text = "RESET PASSWORD",
                 )
             }
         }

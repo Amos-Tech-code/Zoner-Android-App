@@ -14,6 +14,7 @@ import com.zoner.android.ui.feature.search.SearchViewModel
 import com.zoner.android.ui.feature.account.sign_in.SignInViewModel
 import com.zoner.android.ui.feature.account.sign_up.SignUpViewModel
 import com.zoner.android.ui.feature.add_business_profile.CreateBusinessProfileViewModel
+import com.zoner.android.ui.feature.account.complete_profile.CompleteProfileViewModel
 import com.zoner.android.ui.feature.post_details.PostDetailsViewModel
 import com.zoner.android.ui.feature.settings.SettingsViewModel
 import com.zoner.android.ui.feature.view_status.StatusViewerViewModel
@@ -24,18 +25,19 @@ val viewModelModule  = module {
 
     viewModel { MainViewModel(get(), get()) }
     viewModel { OnboardingViewModel(get()) }
-    viewModel { SignInViewModel() }
-    viewModel { SignUpViewModel() }
-    viewModel { ResetPasswordViewModel() }
+    viewModel { SignInViewModel(get(), get()) }
+    viewModel { SignUpViewModel(get(), get()) }
+    viewModel { CompleteProfileViewModel(get(), get()) }
+    viewModel { ResetPasswordViewModel(get(), get()) }
     viewModel { CountrySelectionViewModel(get()) }
-    viewModel { OtpVerificationViewModel() }
-    viewModel { HomeViewModel(get()) }
+    viewModel { OtpVerificationViewModel(get(), get(), get()) }
+    viewModel { HomeViewModel(get(), get()) }
     viewModel { SearchViewModel() }
-    viewModel { AddPostViewModel(get(), get<Application>().applicationContext) }
+    viewModel { AddPostViewModel(get(), get(), get<Application>().applicationContext) }
     viewModel { NotificationViewModel() }
-    viewModel { ProfileViewModel() }
-    viewModel { CreateBusinessProfileViewModel() }
-    viewModel { SettingsViewModel() }
+    viewModel { ProfileViewModel(get()) }
+    viewModel { CreateBusinessProfileViewModel(get(), get()) }
+    viewModel { SettingsViewModel(get()) }
     viewModel { PostDetailsViewModel() }
     viewModel { StatusViewerViewModel(get()) }
 }

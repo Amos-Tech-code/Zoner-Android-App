@@ -8,6 +8,7 @@ import androidx.core.content.FileProvider
 import com.zoner.data.local.database.ZonerDatabase
 import com.zoner.data.local.database.dao.StatusItemsDao
 import com.zoner.data.local.database.entities.UserStatusEntity
+import com.zoner.domain.model.StatusGroup
 import com.zoner.domain.model.UserStatus
 import com.zoner.domain.model.isExpired
 import com.zoner.domain.repository.StatusRepository
@@ -61,11 +62,27 @@ class StatusRepositoryImpl (
         }
     }
 
-    override suspend fun getUserStatuses(): Flow<List<UserStatus>> {
+    // First, let's create a repository method that groups statuses by user
+    @OptIn(ExperimentalTime::class)
+    override suspend fun getStatusGroups(): Flow<List<StatusGroup>> {
         return withContext(dispatchers) {
             dao.getUserStatuses().map { entities ->
-                entities.map { it.toDomain() }
+                // Convert to domain models and filter expired
+                val statuses = entities.map { it.toDomain() }
                     .filterNot { it.isExpired() }
+
+                // Group by user (you'll need to adjust this based on your user model)
+                statuses.groupBy { it.userId } // Assuming UserStatus has userId field
+                    .map { (userId, userStatuses) ->
+                        StatusGroup(
+                            authorId = userId,
+                            authorName = userStatuses.firstOrNull()?.userName,
+                            authorAvatar = userStatuses.firstOrNull()?.userAvatar,
+                            statuses = userStatuses.sortedByDescending { it.createdAt },
+                            updatedAt = userStatuses.maxOfOrNull { it.createdAt.toEpochMilliseconds() } ?: 0L
+                        )
+                    }
+                    .sortedByDescending { it.updatedAt }
             }
         }
     }

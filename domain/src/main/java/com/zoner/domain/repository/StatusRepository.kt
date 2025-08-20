@@ -1,12 +1,13 @@
 package com.zoner.domain.repository
 
+import com.zoner.domain.model.StatusGroup
 import com.zoner.domain.model.UserStatus
 import kotlinx.coroutines.flow.Flow
 
 interface StatusRepository {
     suspend fun saveStatus(status: UserStatus)
 
-    suspend fun getUserStatuses() : Flow<List<UserStatus>>
+    suspend fun getStatusGroups(): Flow<List<StatusGroup>>
 
     suspend fun getPendingStatuses(): List<UserStatus>
 

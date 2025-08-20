@@ -128,6 +128,7 @@ fun FullScreenVideoPlayer(
 @OptIn(UnstableApi::class)
 @Composable
 fun StatusVideoPlayer(
+    modifier: Modifier = Modifier,
     uri: Uri,
     paused: Boolean,
     onProgress: (Float) -> Unit,
@@ -176,7 +177,7 @@ fun StatusVideoPlayer(
         }
     }
 
-    Box(Modifier.fillMaxSize()) {
+    Box(modifier.fillMaxSize()) {
         AndroidView(
             factory = { PlayerView(it).apply {
                 player = exoPlayer

@@ -2,19 +2,21 @@ package com.zoner.android.ui.feature.profile
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.zoner.data.local.datastore.ZonerSession
+import com.zoner.domain.model.LocalUser
 import com.zoner.domain.model.MediaType
+import com.zoner.domain.model.UserRole
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-class ProfileViewModel : ViewModel() {
-
-    private val _uiState = MutableStateFlow<UIProfileState>(UIProfileState.Loading)
-    val uiState = _uiState.asStateFlow()
-
+class ProfileViewModel(
+    private val session: ZonerSession
+) : ViewModel() {
     private val _state = MutableStateFlow(ProfileState())
     val state: StateFlow<ProfileState> = _state
 
@@ -22,22 +24,33 @@ class ProfileViewModel : ViewModel() {
     val event = _event.receiveAsFlow()
 
     init {
+        observeUserFromLocal()
         loadDummyData()
+    }
+
+    private fun observeUserFromLocal() {
+        viewModelScope.launch {
+            _state.update { it.copy(isLoading = true) }
+            session.getUser().collect { user ->
+                if (user != null) {
+                    _state.update {
+                        it.copy(
+                            user = user,
+                            isBusinessAccount = user.isBusiness,
+                            isLoading = false
+                        )
+                    }
+                }
+            }
+        }
     }
 
     private fun loadDummyData() {
         _state.value = ProfileState(
-            user = getDummyUser(),
             posts = getDummyPosts(),
             replies = getDummyReplies(),
             likedPosts = getDummyLikedPosts(),
             bookmarkedPosts = getDummyBookmarkedPosts()
-        )
-    }
-
-    fun toggleAccountType() {
-        _state.value = _state.value.copy(
-            isBusinessAccount = !_state.value.isBusinessAccount
         )
     }
 
@@ -144,6 +157,22 @@ class ProfileViewModel : ViewModel() {
                 likes = 12,
                 isLiked = true,
                 isPartOfThread = true
+            ),
+            Reply(
+                id = "reply_2",
+                postId = "post_2",
+                content = "This item seems to be cool. How can I get it.",
+                author = User(
+                    id = "user_456",
+                    name = "Sam Wilson",
+                    username = "samw",
+                    avatarUrl = "https://picsum.photos/200/200?random=2"
+                ),
+                timestamp = System.currentTimeMillis() - 3600000,
+                originalPosterUsername = "alexj",
+                likes = 12,
+                isLiked = true,
+                isPartOfThread = true
             )
         )
     }
@@ -228,12 +257,13 @@ class ProfileViewModel : ViewModel() {
 
 // Data Classes
 data class ProfileState(
-    val user: User = User(),
+    val user: LocalUser? = null,
     val isBusinessAccount: Boolean = true,
     val posts: List<Post> = emptyList(),
     val replies: List<Reply> = emptyList(),
     val likedPosts: List<Post> = emptyList(),
     val bookmarkedPosts: List<Post> = emptyList(),
+    val isLoading: Boolean = false,
 )
 
 data class User(

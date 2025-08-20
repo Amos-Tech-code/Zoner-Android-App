@@ -115,7 +115,9 @@ fun SuccessAlertDialog(
                 Text(
                     text = title,
                     style = titleTextStyle,
-                    color = MaterialTheme.colorScheme.onSurface
+                    textAlign = TextAlign.Center,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface.copy()
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
@@ -159,7 +161,7 @@ fun SuccessAlertDialog(
 
 @Composable
 fun ErrorAlertDialog(
-    title: String = "Error",
+    title: String = "Something went wrong",
     message: String,
     icon: (@Composable () -> Unit)? = null,
     onDismissRequest: () -> Unit,
@@ -191,6 +193,7 @@ fun ErrorAlertDialog(
                 Text(
                     text = title,
                     style = titleTextStyle,
+                    textAlign = TextAlign.Center,
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
@@ -305,3 +308,33 @@ fun AccountRequiredDialog(
         }
     }
 }
+
+
+@Composable
+fun LogoutConfirmDialog(
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        properties = DialogProperties(
+            dismissOnBackPress = true,
+            dismissOnClickOutside = true
+        ),
+        onDismissRequest = onDismiss,
+        title = { Text("Confirm Logout") },
+        text = { Text("Are you sure you want to log out?") },
+        confirmButton = {
+            TextButton(
+                onClick = onConfirm
+            ) {
+                Text("Logout", color = MaterialTheme.colorScheme.error)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
+}
+

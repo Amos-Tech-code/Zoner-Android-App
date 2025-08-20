@@ -1,5 +1,8 @@
 package com.zoner.android.util
 
+import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
+
 
 // Extension function to format numbers (e.g. 1500 -> 1.5K)
 fun Int.formatShort(): String {
@@ -7,6 +10,20 @@ fun Int.formatShort(): String {
         this >= 1_000_000 -> "%.1fM".format(this / 1_000_000f)
         this >= 1_000 -> "%.1fK".format(this / 1_000f)
         else -> toString()
+    }
+}
+
+
+// Improved extension function that handles Instant directly
+@OptIn(ExperimentalTime::class)
+fun Instant.toRelativeTime(): String {
+    val seconds = (System.currentTimeMillis() - this.toEpochMilliseconds()) / 1000
+    return when {
+        seconds < 60 -> "${seconds}s"
+        seconds < 3600 -> "${seconds / 60}m"
+        seconds < 86400 -> "${seconds / 3600}h"
+        seconds < 2592000 -> "${seconds / 86400}d"
+        else -> "${seconds / 2592000}mo"
     }
 }
 

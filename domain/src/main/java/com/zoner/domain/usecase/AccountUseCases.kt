@@ -22,8 +22,8 @@ class RegisterUseCase(private val repository: AccountRepository) {
 }
 
 class ValidateUserNameUseCase(private val repository: AccountRepository) {
-    suspend operator fun invoke(value: String) =
-        repository.validateUserName(value)
+    suspend operator fun invoke(userId: String, username: String) =
+        repository.validateUserName(userId, username)
 }
 
 class VerifyUseCase(private val repository: AccountRepository) {
@@ -43,5 +43,5 @@ class ResetPasswordUseCase(private val repository: AccountRepository) {
 
 class ResendOtpUseCase(private val repository: AccountRepository) {
     suspend operator fun invoke(email: String) =
-        repository.resendOtp(email)
+        repository.requestNewOTP(email)
 }

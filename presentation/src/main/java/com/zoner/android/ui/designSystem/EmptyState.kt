@@ -19,11 +19,12 @@ import androidx.compose.ui.unit.dp
 
 @Composable
 fun EmptyState(
+    modifier: Modifier = Modifier,
     icon: ImageVector,
     message: String
 ) {
     Column(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxSize()
             .padding(32.dp),
         horizontalAlignment = Alignment.CenterHorizontally,

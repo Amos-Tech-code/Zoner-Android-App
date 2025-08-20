@@ -5,9 +5,10 @@ import androidx.credentials.CredentialManager
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.zoner.android.Oauth.GoogleAuthUiProvider
+import com.zoner.domain.repository.AccountRepository
 import kotlinx.coroutines.launch
 
-abstract class BaseAuthViewModel() : ViewModel() {
+abstract class BaseAuthViewModel : ViewModel() {
 
     var error: String = ""
     var errorDescription = ""
@@ -31,29 +32,11 @@ abstract class BaseAuthViewModel() : ViewModel() {
                     CredentialManager.create(context)
                 )
                 //Log.d("Google", response.toString())
-                fetchGoogleToken(response.token)
+                onGoogleLoginSuccess(response.token)
             } catch (e: Throwable) {
                 onGoogleError(e.message.toString())
             }
         }
-    }
-
-    private fun fetchGoogleToken(token: String) {
-        onGoogleError("An error Occurred")
-//        viewModelScope.launch {
-//            val result = socialSignInUseCase.executeGoogle(token)
-//
-//            when (result) {
-//                is ResultWrapper.Success -> {
-//                    onSocialLoginSuccess(result.value.message)
-//                }
-//
-//                is ResultWrapper.Failure -> {
-//                    onGoogleError(result.exception.message ?: "Unknown error")
-//
-//                }
-//            }
-//        }
     }
 
 
