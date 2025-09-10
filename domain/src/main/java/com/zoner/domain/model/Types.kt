@@ -20,8 +20,12 @@ enum class PostType {
     POST, STATUS
 }
 
+enum class SyncStatus { PENDING, SYNCED, FAILED }
+
 enum class Audience(val displayName: String) {
     PUBLIC("Public"),
     PEOPLE_NEAR_ME("People Near me"),
     CUSTOM("Custom")
 }
+
+enum class InteractionType { VIEW, LIKE, REPLY }

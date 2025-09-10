@@ -68,6 +68,7 @@ class SignInViewModel(
                             result.value.user.registrationStage == "EMAIL_SUBMITTED" -> RegistrationStage.EMAIL_SUBMITTED
                             result.value.user.registrationStage == "EMAIL_VERIFIED" -> RegistrationStage.EMAIL_VERIFIED
                             result.value.user.registrationStage == "PROFILE_COMPLETED" -> RegistrationStage.PROFILE_COMPLETED
+                            result.value.user.registrationStage == "BUSINESS_ADDED" -> RegistrationStage.PROFILE_COMPLETED
                             else -> null
                         }
                         val userRole = when {
@@ -144,6 +145,7 @@ class SignInViewModel(
                             result.value.user.registrationStage == "EMAIL_SUBMITTED" -> RegistrationStage.EMAIL_SUBMITTED
                             result.value.user.registrationStage == "EMAIL_VERIFIED" -> RegistrationStage.EMAIL_VERIFIED
                             result.value.user.registrationStage == "PROFILE_COMPLETED" -> RegistrationStage.PROFILE_COMPLETED
+                            result.value.user.registrationStage == "BUSINESS_ADDED" -> RegistrationStage.PROFILE_COMPLETED
                             else -> null
                         }
                         val userRole = when {

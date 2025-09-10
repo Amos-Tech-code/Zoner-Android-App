@@ -2,8 +2,10 @@ package com.zoner.android.ui.feature.view_status
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.zoner.domain.model.InteractionType
+import com.zoner.domain.model.OtherUserStatus
 import com.zoner.domain.model.StatusGroup
-import com.zoner.domain.model.UserStatus
+import com.zoner.domain.model.request.RecordStatusInteraction
 import com.zoner.domain.repository.StatusRepository
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -12,6 +14,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlin.collections.getOrNull
 
 class StatusViewerViewModel(
     private val repository: StatusRepository,
@@ -34,7 +37,7 @@ class StatusViewerViewModel(
         _viewingState.update { it.copy(isLoading = true) }
         viewModelScope.launch {
             try {
-                repository.getStatusGroups().collect { groups ->
+                repository.fetchOtherUsersStatusFromLocal().collect { groups ->
                     if (groups.isNotEmpty()) {
                         statusGroups = groups
                         startViewingGroup(0)
@@ -121,9 +124,15 @@ class StatusViewerViewModel(
 
     private fun markStatusViewed(index: Int) {
         val status = _viewingState.value.statuses.getOrNull(index) ?: return
-        if (!status.isViewed) {
+        if (status is OtherUserStatus && !status.isViewed) {
             viewModelScope.launch {
-                repository.markStatusAsViewed(status.id)
+                repository.recordInteraction(
+                    RecordStatusInteraction(
+                        statusId = status.id,
+                        userId = getCurrentUserId(),
+                        type = InteractionType.VIEW
+                    )
+                )
             }
         }
     }

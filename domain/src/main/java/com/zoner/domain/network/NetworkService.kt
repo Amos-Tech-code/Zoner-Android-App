@@ -1,6 +1,10 @@
 package com.zoner.domain.network
 
+import android.net.Uri
 import com.zoner.domain.ResultWrapper
+import com.zoner.domain.model.InteractionType
+import com.zoner.domain.model.SaveUserStatus
+import com.zoner.domain.model.StatusGroup
 import com.zoner.domain.model.request.CompleteProfileRequest
 import com.zoner.domain.model.request.CreateBusinessProfile
 import com.zoner.domain.model.request.LoginRequest
@@ -10,6 +14,7 @@ import com.zoner.domain.model.response.GenericResponse
 import com.zoner.domain.model.response.LoginResponse
 import com.zoner.domain.model.response.RegisterResponse
 import com.zoner.domain.model.response.ResendOtpResponse
+import com.zoner.domain.model.response.StatusUploadResponse
 import com.zoner.domain.model.response.UsernameAvailability
 
 // Network Service
@@ -44,4 +49,27 @@ interface NetworkService {
      */
     suspend fun createBusinessProfile(businessProfile: CreateBusinessProfile): ResultWrapper<LoginResponse>
 
+
+    /**
+     * Status Related Services
+     */
+    suspend fun uploadStatus(status: SaveUserStatus): ResultWrapper<StatusUploadResponse>
+
+    suspend fun getUserStatuses(): List<StatusGroup>
+
+    suspend fun getOtherUsersStatuses(): List<StatusGroup>
+
+    suspend fun downloadStatusMedia(serverId: String): ByteArray
+
+    suspend fun deleteStatus(statusId: String) : ResultWrapper<GenericResponse>
+
+    suspend fun updateStatus(statusId: String, status: SaveUserStatus) : ResultWrapper<GenericResponse>
+
+    suspend fun recordInteraction(
+        statusId: String,
+        userId: String,
+        type: InteractionType,
+        replyText: String?,
+        replyMediaUri: Uri?
+    )
 }

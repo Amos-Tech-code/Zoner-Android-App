@@ -10,9 +10,19 @@ sealed class ResultWrapper<out T> {
 }
 
 // Upload Status Wrapper
+//sealed class StatusState {
+//    data object Pending : StatusState()
+//    data object Uploading : StatusState()
+//
+//    data class Failed(val error: String) : StatusState()
+//    data object Uploaded : StatusState()
+//}
+
 sealed class StatusState {
-    data object Pending : StatusState()
-    data object Uploading : StatusState()
-    data class Failed(val error: String) : StatusState()
-    data object Uploaded : StatusState()
+    abstract val stateName: String
+    object Pending : StatusState() { override val stateName = "PENDING" }
+    object Uploading : StatusState() { override val stateName = "UPLOADING" }
+
+    data class Failed(val error: String) : StatusState() { override val stateName = "FAILED" }
+    object Uploaded : StatusState() { override val stateName = "UPLOADED" }
 }

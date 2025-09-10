@@ -50,9 +50,9 @@ import com.zoner.android.ui.designSystem.StatusVideoPlayer
 import com.zoner.android.ui.designSystem.ZonerAsyncImage
 import com.zoner.android.util.ObserveAsEvents
 import com.zoner.android.util.toRelativeTime
+import com.zoner.domain.model.BaseStatus
 import com.zoner.domain.model.MediaType
 import com.zoner.domain.model.StatusGroup
-import com.zoner.domain.model.UserStatus
 import org.koin.androidx.compose.koinViewModel
 import kotlin.time.ExperimentalTime
 
@@ -134,7 +134,7 @@ private fun StatusViewerContent(
 
 @Composable
 private fun StatusMediaContent(
-    status: UserStatus,
+    status: BaseStatus,
     isPaused: Boolean,
     onProgressChanged: (Float) -> Unit,
     onMediaEnded: () -> Unit,
@@ -164,7 +164,7 @@ private fun StatusMediaContent(
 
 @Composable
 private fun StatusImageViewer(
-    status: UserStatus,
+    status: BaseStatus,
     isPaused: Boolean,
     onProgressChanged: (Float) -> Unit,
     onAnimationFinished: () -> Unit,

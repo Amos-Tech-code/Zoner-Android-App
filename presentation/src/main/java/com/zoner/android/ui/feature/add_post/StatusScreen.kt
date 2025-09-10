@@ -195,7 +195,7 @@ fun StatusMediaCarousel(
                     .animateItem()
             ) {
                 if (status.media?.let { context.isVideoUri(it) } == true) {
-                    VideoThumbnail(status.media, onVideoPlayClicked = { onVideoPlayClicked(status.media) })
+                    VideoThumbnail(uri = status.media, onVideoPlayClicked = { onVideoPlayClicked(status.media) })
                 } else {
                     ZonerAsyncImage(
                         imageUrl = status.media,

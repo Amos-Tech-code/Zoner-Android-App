@@ -44,7 +44,7 @@ val localModule = module {
     }
 
     // WorkManager configuration
-    single { KoinWorkerFactory(get()) }
+    single { KoinWorkerFactory() }
 
     // Dispatchers
     single<CoroutineDispatcher> { Dispatchers.IO }
@@ -57,7 +57,9 @@ val localModule = module {
     single { CountryLocalDataSource(get()) }
 
     // DAOs
-    single { get<ZonerDatabase>().statusItemsDao() }
+    single { get<ZonerDatabase>().userStatusDao() }
+    single { get<ZonerDatabase>().otherUsersStatusDao() }
+    single { get<ZonerDatabase>().statusInteractionsDao() }
 
 
 }

@@ -1,50 +1,110 @@
 package com.zoner.domain.model
 
-import android.content.Context
 import android.net.Uri
-import androidx.core.content.FileProvider
 import com.zoner.domain.StatusState
-import java.io.File
 import kotlin.time.Clock
-import kotlin.time.Duration.Companion.hours
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
-// Group of Status
+// Generic StatusGroup that can contain both MyStatus and OtherUserStatus
+@OptIn(ExperimentalTime::class)
 data class StatusGroup(
     val authorId: String,
     val authorName: String?,
     val authorAvatar: String?,
-    val statuses: List<UserStatus>,
-    val updatedAt: Long? = null
+    val statuses: List<BaseStatus>, //To handle both types
+    val updatedAt: Long? = null,
+    val unviewedCount: Int = 0,
+    val isMyStatus: Boolean = false // Flag to distinguish user's own statuses
 )
 
 
+// Base sealed class for all status types
 @OptIn(ExperimentalTime::class)
-data class UserStatus(
-    val id: String,
-    val userId: String,  // Add this field
-    val userName: String?,  // Add this field
-    val userAvatar: String?,  // Add this field
-    val mediaUri: Uri,
-    val caption: String,
-    val mediaType: MediaType,
-    val createdAt: Instant,
-    val state: StatusState,
-    val durationMillis: Long = if (mediaType == MediaType.IMAGE) 5000 else 0L,
-    val uploadTime: Instant? = null,
-    val localFilePath: String? = null,
-    val isViewed: Boolean = false
-)
+sealed class BaseStatus {
+    abstract val id: String
+    abstract val mediaUri: Uri
+    abstract val caption: String?
+    abstract val mediaType: MediaType
+    abstract val createdAt: Instant
+    abstract val durationMillis: Long
+    abstract val localFilePath: String?
+    abstract val expiresAt: Instant?
+    abstract val likes: List<StatusInteraction>
+    abstract val views: List<StatusInteraction>
+    abstract val replies: List<StatusInteraction>
 
-// Extensions to check expired status
-@OptIn(ExperimentalTime::class)
-fun UserStatus.isExpired(): Boolean {
-    return this.uploadTime?.let { uploadTime ->
-        val expirationTime = uploadTime + 24.hours
-        Clock.System.now() > expirationTime
-    } ?: false
+    // Common helper methods
+    fun isExpired(): Boolean {
+        return expiresAt?.let { Clock.System.now() > it } ?: false
+    }
+
 }
 
-// Response after query for expired status media paths
-data class StatusPath(val id: String, val localPath: String?)
+// Your own statuses
+@OptIn(ExperimentalTime::class)
+data class MyStatus(
+    override val id: String,
+    override val mediaUri: Uri,
+    override val caption: String?,
+    override val mediaType: MediaType,
+    override val createdAt: Instant,
+    val state: StatusState,
+    override val durationMillis: Long,
+    override val localFilePath: String?,
+    override val expiresAt: Instant,
+    override val likes: List<StatusInteraction>,
+    override val views: List<StatusInteraction>,
+    override val replies: List<StatusInteraction>
+) : BaseStatus()
+
+// Other users' statuses
+@OptIn(ExperimentalTime::class)
+data class OtherUserStatus(
+    override val id: String,
+    override val mediaUri: Uri,
+    override val caption: String?,
+    override val mediaType: MediaType,
+    override val createdAt: Instant,
+    val isViewed: Boolean,
+    val isDownloaded: Boolean,
+    val blurHash: String?,
+    override val durationMillis: Long,
+    override val localFilePath: String?,
+    override val expiresAt: Instant,
+    override val likes: List<StatusInteraction>,
+    override val views: List<StatusInteraction>,
+    override val replies: List<StatusInteraction>,
+) : BaseStatus()
+
+
+@OptIn(ExperimentalTime::class)
+data class StatusInteraction(
+    val id: Long,
+    val userId: String,
+    val userName: String?,
+    val userAvatar: String?,
+    val type: InteractionType,
+    val timestamp: Instant,
+    val replyText: String?,
+    val replyMediaUri: Uri?
+)
+
+
+@OptIn(ExperimentalTime::class)
+data class SaveUserStatus(
+    val id: Long = 0,
+    val mediaUri: Uri,
+    val caption: String? = null,
+    val mediaType: MediaType,
+    val createdAt: Instant = Clock.System.now(),
+    val state: StatusState = StatusState.Pending,
+    val durationMillis: Long = 0L,
+    val localFilePath: String? = null,
+)
+
+data class UserStatusSummary(
+    val totalCount: Int,
+    val latestStatus: BaseStatus?,
+    val countsByState: Map<String, Int>
+)

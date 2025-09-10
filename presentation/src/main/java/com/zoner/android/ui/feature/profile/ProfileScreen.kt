@@ -24,6 +24,7 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.ToggleOff
 import androidx.compose.material.icons.filled.Verified
@@ -205,15 +206,31 @@ private fun ProfileHeader(
     ) {
         if (isBusinessAccount) {
             Box(modifier = Modifier.fillMaxWidth()) {
-                ZonerAsyncImage(
-                    imageUrl = user?.businessLogo,
-                    contentDescription = "Business Profile picture",
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(100.dp)
-                        .clip(RoundedCornerShape(bottomStart = 12.dp, bottomEnd = 12.dp))
-                )
+                Box(modifier = Modifier.fillMaxWidth().height(120.dp)) {
+                    ZonerAsyncImage(
+                        imageUrl = user?.businessLogo
+                            ?: "https://issukbsivkkqzsghassb.supabase.co/storage/v1/object/public/zoner_bucket/system/Placeholder%20Cover.png",
+                        contentDescription = "Business Profile picture",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(bottomStart = 12.dp, bottomEnd = 12.dp))
+                    )
+                    IconButton(
+                        onClick = {},
+                        modifier = Modifier
+                            .padding(8.dp)
+                            .background(Color.Black.copy(alpha = 0.5f), CircleShape)
+                            .align(Alignment.TopEnd)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Edit,
+                            contentDescription = "Edit profile cover picture",
+                            tint = Color.White,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                }
                 Box(modifier = Modifier
                     .size(80.dp)
                     .offset(y = 20.dp)

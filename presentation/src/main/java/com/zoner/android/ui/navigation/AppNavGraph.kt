@@ -22,6 +22,7 @@ import com.zoner.android.ui.feature.onboarding.OnboardingScreen
 import com.zoner.android.ui.feature.post_details.PostDetailsScreen
 import com.zoner.android.ui.feature.settings.SettingsScreen
 import com.zoner.android.ui.feature.view_status.StatusViewerScreen
+import com.zoner.android.ui.feature.view_status.user_status.MyStatusScreen
 
 @Composable
 fun AppNavGraph(
@@ -112,6 +113,10 @@ fun AppNavGraph(
 
         composable<PostDetailsRoute> {
             PostDetailsScreen(navController)
+        }
+
+        composable<UserStatusRoute> {
+            MyStatusScreen(navController)
         }
 
         composable<StatusViewRoute> {

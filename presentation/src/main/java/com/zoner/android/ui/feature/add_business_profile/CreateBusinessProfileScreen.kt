@@ -363,11 +363,7 @@ private fun CreateBusinessForm(
                 onClick = onTermsClicked
             )
         }
-        ZonerButton(
-            text = "Create Business Account",
-            onClick = onCreateAccount,
-            modifier = Modifier
-        )
+
         Button(
             onClick = {
                 onCreateAccount()

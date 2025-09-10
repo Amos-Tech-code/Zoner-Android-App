@@ -3,9 +3,7 @@ package com.zoner.data.utils
 import org.json.JSONObject
 
 //Helper function to extract error message from error body
-fun
-
-        extractErrorMessage(errorBody: String?, statusCode: Int): String {
+fun extractErrorMessage(errorBody: String?, statusCode: Int): String {
     if (errorBody.isNullOrBlank()) return getDefaultErrorMessage(statusCode)
 
     return try {

@@ -28,6 +28,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -35,6 +37,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -49,6 +52,7 @@ import com.zoner.android.ui.designSystem.ZonerSpacer
 import com.zoner.android.ui.navigation.MainAppRoute
 import com.zoner.android.ui.navigation.SignInRoute
 import com.zoner.android.util.ObserveAsEvents
+import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
 
 @Composable
@@ -57,6 +61,9 @@ fun SettingsScreen(
     viewModel: SettingsViewModel = koinViewModel()
 ) {
 
+    val scope = rememberCoroutineScope()
+    val snackBarHostState = remember { SnackbarHostState() }
+
     ObserveAsEvents(viewModel.event) { event ->
         when (event) {
             SettingsEvent.LogOut -> {
@@ -64,12 +71,19 @@ fun SettingsScreen(
                     popUpTo(MainAppRoute) { inclusive = true }
                 }
             }
+
+            is SettingsEvent.ShowError -> {
+                scope.launch { snackBarHostState.showSnackbar(event.message) }
+            }
         }
     }
 
     Scaffold(
         topBar = {
             SettingsTopAppBar { navController.popBackStack() }
+        },
+        snackbarHost = {
+            SnackbarHost(snackBarHostState)
         }
     ) { innerPadding ->
         SettingsScreenContent(

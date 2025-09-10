@@ -1,9 +1,14 @@
 package com.zoner.android.ui.feature.home
 
 import android.widget.Toast
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -26,6 +31,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -33,7 +39,8 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Error
+import androidx.compose.material.icons.outlined.ErrorOutline
+import androidx.compose.material.icons.outlined.NotStarted
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -48,6 +55,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -84,14 +92,11 @@ import com.zoner.android.ui.designSystem.VideoThumbnail
 import com.zoner.android.ui.designSystem.ZonerAsyncImage
 import com.zoner.android.ui.feature.profile.Post
 import com.zoner.android.ui.navigation.PostDetailsRoute
-import com.zoner.android.ui.navigation.StatusViewRoute
+import com.zoner.android.ui.navigation.UserStatusRoute
 import com.zoner.android.ui.theme.ZonerInfo
 import com.zoner.android.util.ObserveAsEvents
-import com.zoner.domain.StatusState
 import com.zoner.domain.model.LocalUser
 import com.zoner.domain.model.MediaType
-import com.zoner.domain.model.StatusGroup
-import com.zoner.domain.model.UserStatus
 import org.koin.androidx.compose.koinViewModel
 import kotlin.math.min
 
@@ -117,7 +122,7 @@ fun HomeScreen(
         topBar = {
             HomeScreenTopBar(
                 scrollBehavior = scrollBehavior,
-                userStatus = (state as? HomeState.Success)?.userStatusItems ?: emptyList(),
+                myStatusUiState = (state as? HomeState.Success)?.userStatusSummary ?: MyStatusUiState(),
                 otherStatus = (state as? HomeState.Success)?.otherStatus ?: emptyList(),
                 isBusinessAccount = (state as? HomeState.Success)?.isBusinessAccount ?: false,
                 user = viewModel.loggedInUser,
@@ -125,7 +130,7 @@ fun HomeScreen(
                 onAddPostClick = onNavigateToAddPost,
                 onAddStatusClick = onNavigateToAddStatus,
                 onStatusClicked = {},
-                onMyStatusClick = { navController.navigate(StatusViewRoute) },
+                onMyStatusClick = { navController.navigate(UserStatusRoute) },
                 modifier = Modifier.fillMaxWidth()
             )
         }
@@ -218,14 +223,14 @@ fun HomeScreen(
 private fun HomeScreenTopBar(
     modifier: Modifier = Modifier,
     scrollBehavior: TopAppBarScrollBehavior,
+    myStatusUiState: MyStatusUiState,
     otherStatus: List<Status>,
-    userStatus: List<UserStatus>,
     isBusinessAccount: Boolean,
     isLoading: Boolean,
     user: LocalUser?,
     onAddPostClick: () -> Unit,
     onStatusClicked: (Status) -> Unit,
-    onMyStatusClick: (List<UserStatus>) -> Unit,
+    onMyStatusClick: () -> Unit,
     onAddStatusClick: () -> Unit,
 ) {
     TopAppBar(
@@ -241,7 +246,7 @@ private fun HomeScreenTopBar(
                 } else {
                     StatusItems(
                         otherStatus = otherStatus,
-                        userStatus = userStatus,
+                        myStatusUiState = myStatusUiState,
                         isBusinessAccount = isBusinessAccount,
                         onAddStatusClick = onAddStatusClick,
                         onStatusClicked = onStatusClicked,
@@ -319,12 +324,12 @@ private fun HomeScreenHeader(
 
 @Composable
 private fun StatusItems(
-    userStatus: List<UserStatus>,
+    myStatusUiState: MyStatusUiState,
     otherStatus: List<Status>,
     isBusinessAccount: Boolean,
     onAddStatusClick: () -> Unit,
     onStatusClicked: (Status) -> Unit,
-    onMyStatusClick: (List<UserStatus>) -> Unit,
+    onMyStatusClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     LazyRow(
@@ -338,12 +343,11 @@ private fun StatusItems(
                 )
             }
         }
-        if (userStatus.isNotEmpty()) {
+        if (myStatusUiState.latestStatus != null) {
             item {
                 UStatusItem(
-                    status = userStatus.last(),
-                    statusCount = userStatus.size,
-                    onClick = { onMyStatusClick(userStatus) }
+                    state = myStatusUiState,
+                    onClick = { onMyStatusClick() }
                 )
             }
         }
@@ -428,59 +432,44 @@ fun PostsList(
     }
 }
 
-
-@Composable
-private fun AddStatusItem(
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit
-) {
-
-    Box {
-        Box(
-            modifier = modifier
-                .size(60.dp)
-                .clip(CircleShape)
-                .border(
-                    width = 2.dp,
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                .clickable { onClick() },
-        ) {
-            Image(
-                painter = painterResource(R.drawable.ic_circle_logo),
-                contentDescription = null,
-                modifier = Modifier.align(Alignment.Center)
-            )
-
-        }
-
-        Icon(
-            painter = painterResource(R.drawable.ic_add),
-            contentDescription = "Add Status",
-            modifier = Modifier
-                .size(24.dp)
-                .align(Alignment.BottomEnd),
-        )
-    }
-}
-
-
 @Composable
 private fun UStatusItem(
     modifier: Modifier = Modifier,
-    status: UserStatus,
-    statusCount: Int = 1,
+    state: MyStatusUiState,
     onClick: () -> Unit
 ) {
+    // Determine border color based on state
     val borderColor = when {
-        status.state is StatusState.Failed -> MaterialTheme.colorScheme.error
-        status.isViewed -> MaterialTheme.colorScheme.outline
+        state.failed > 0 -> MaterialTheme.colorScheme.error
+        state.uploading > 0 -> MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
         else -> MaterialTheme.colorScheme.primary
     }
 
+    // Handle progress animation for uploading state
+    val progress = remember { Animatable(0f) }
+
+    LaunchedEffect(state.uploading) {
+        if (state.uploading > 0) {
+            // Animate progress when uploading
+            progress.animateTo(
+                targetValue = 0.8f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(1500, easing = LinearEasing),
+                    repeatMode = RepeatMode.Restart
+                )
+            )
+        } else {
+            // Reset progress when not uploading
+            progress.snapTo(0f)
+        }
+    }
+
+    val baseCircleColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+
     Column(
-        modifier = modifier.size(70.dp),
+        modifier = modifier
+            .width(70.dp)
+            .wrapContentHeight(),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Box(
@@ -492,14 +481,24 @@ private fun UStatusItem(
                 val strokeWidth = 2.dp.toPx()
                 val radius = size.minDimension / 2 - strokeWidth / 2
 
-                if (statusCount > 1) {
-                    val segmentAngle = 360f / min(statusCount, 8) // Max 8 segments for visibility
-                    repeat(min(statusCount, 8)) { index ->
+                // Draw base circle (subtle background)
+                drawCircle(
+                    color = baseCircleColor,
+                    radius = radius,
+                    style = Stroke(strokeWidth)
+                )
+
+                // Draw status segments
+                if (state.statusCount > 1) {
+                    val segmentAngle = 360f / min(state.statusCount, 8)
+                    val sweepAngle = segmentAngle * 0.85f // Gap between segments
+
+                    repeat(min(state.statusCount, 8)) { index ->
                         val startAngle = index * segmentAngle - 90f
                         drawArc(
                             color = borderColor,
                             startAngle = startAngle,
-                            sweepAngle = segmentAngle * 0.9f, // Small gap between segments
+                            sweepAngle = sweepAngle,
                             useCenter = false,
                             topLeft = Offset(strokeWidth, strokeWidth),
                             size = Size(size.width - strokeWidth * 2, size.height - strokeWidth * 2),
@@ -507,52 +506,144 @@ private fun UStatusItem(
                         )
                     }
                 } else {
+                    // Single status - full circle
                     drawCircle(
                         color = borderColor,
                         radius = radius,
                         style = Stroke(strokeWidth)
                     )
                 }
+
+                // Draw progress indicator for uploading
+                if (state.uploading > 0) {
+                    drawArc(
+                        color = borderColor.copy(alpha = 0.3f),
+                        startAngle = -90f,
+                        sweepAngle = 360f * progress.value,
+                        useCenter = false,
+                        topLeft = Offset(strokeWidth, strokeWidth),
+                        size = Size(size.width - strokeWidth * 2, size.height - strokeWidth * 2),
+                        style = Stroke(strokeWidth)
+                    )
+                }
             }
 
-            // Status content
+            // Status content container
             Box(
                 modifier = Modifier
-                    .size(52.dp) // Slightly smaller than border
+                    .size(52.dp)
                     .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.surface)
                     .clickable { onClick() },
                 contentAlignment = Alignment.Center
             ) {
-                // Show error/uploading indicators
-                when (status.state) {
-                    is StatusState.Failed -> Icon(
-                        Icons.Default.Error,
-                        contentDescription = "Failed",
-                        tint = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.size(20.dp)
-                    )
-
-                    StatusState.Uploading ->
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(20.dp),
-                            strokeWidth = 2.dp
+                // Show error/uploading indicators or content
+                when {
+                    state.failed > 0 -> {
+                        // Error state
+                        Icon(
+                            Icons.Outlined.ErrorOutline,
+                            contentDescription = "Failed to upload",
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(24.dp)
                         )
 
+                        // Badge showing count of failed statuses
+                        if (state.failed > 1) {
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.BottomEnd)
+                                    .size(16.dp)
+                                    .clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.error)
+                            ) {
+                                Text(
+                                    text = if (state.failed > 9) "9+" else state.failed.toString(),
+                                    color = MaterialTheme.colorScheme.onError,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontSize = 9.sp,
+                                    modifier = Modifier.align(Alignment.Center)
+                                )
+                            }
+                        }
+                    }
+
+                    state.uploading > 0 -> {
+                        // Uploading state
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+
+                        // Badge showing count of uploading statuses
+                        if (state.uploading > 1) {
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.BottomEnd)
+                                    .size(16.dp)
+                                    .clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.primary)
+                            ) {
+                                Text(
+                                    text = if (state.uploading > 9) "9+" else state.uploading.toString(),
+                                    color = MaterialTheme.colorScheme.onPrimary,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontSize = 9.sp,
+                                    modifier = Modifier.align(Alignment.Center)
+                                )
+                            }
+                        }
+                    }
+
                     else -> {
-                        when(status.mediaType) {
+                        // Normal state - show content
+                        when(state.latestStatus?.mediaType) {
                             MediaType.IMAGE -> {
                                 ZonerAsyncImage(
-                                    imageUrl = status.mediaUri,
+                                    imageUrl = state.latestStatus.mediaUri,
                                     contentDescription = "Status preview",
-                                    modifier = Modifier.fillMaxSize(),
+                                    modifier = Modifier.clip(CircleShape),
                                     contentScale = ContentScale.Crop
                                 )
                             }
                             MediaType.VIDEO -> {
                                 VideoThumbnail(
-                                    uri = status.mediaUri,
+                                    uri = state.latestStatus.mediaUri,
+                                    localPath = state.latestStatus.localFilePath,
+                                    showPlayButton = false,
                                     onVideoPlayClicked = onClick,
-                                    modifier = Modifier.fillMaxSize()
+                                    modifier = Modifier.clip(CircleShape)
+                                )
+                            }
+
+                            null -> {
+                                // No media - show placeholder
+                                Icon(
+                                    Icons.Outlined.NotStarted,
+                                    contentDescription = "Empty status",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
+                        }
+
+                        // Badge showing total status count if > 1
+                        if (state.statusCount > 1) {
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.BottomEnd)
+                                    .offset(y = (-4).dp, x = (-4).dp)
+                                    .size(18.dp)
+                                    .clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.primary)
+                            ) {
+                                Text(
+                                    text = if (state.statusCount > 9) "9+" else state.statusCount.toString(),
+                                    color = MaterialTheme.colorScheme.onPrimary,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontSize = 10.sp,
+                                    modifier = Modifier.align(Alignment.Center)
                                 )
                             }
                         }
@@ -561,6 +652,7 @@ private fun UStatusItem(
             }
         }
 
+        // Label
         Text(
             text = "My Status",
             style = MaterialTheme.typography.labelSmall.copy(
@@ -568,10 +660,16 @@ private fun UStatusItem(
                 fontSize = 11.sp
             ),
             maxLines = 1,
-            overflow = TextOverflow.Ellipsis
+            overflow = TextOverflow.Ellipsis,
+            color = when {
+                state.failed > 0 -> MaterialTheme.colorScheme.error
+                state.uploading > 0 -> MaterialTheme.colorScheme.primary
+                else -> MaterialTheme.colorScheme.onSurface
+            }
         )
     }
 }
+
 
 @Composable
 private fun StatusItem(
@@ -609,6 +707,43 @@ private fun StatusItem(
             ),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+
+@Composable
+private fun AddStatusItem(
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+
+    Box {
+        Box(
+            modifier = modifier
+                .size(60.dp)
+                .clip(CircleShape)
+                .border(
+                    width = 2.dp,
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                .clickable { onClick() },
+        ) {
+            Image(
+                painter = painterResource(R.drawable.ic_circle_logo),
+                contentDescription = null,
+                modifier = Modifier.align(Alignment.Center)
+            )
+
+        }
+
+        Icon(
+            painter = painterResource(R.drawable.ic_add),
+            contentDescription = "Add Status",
+            modifier = Modifier
+                .size(24.dp)
+                .align(Alignment.BottomEnd),
         )
     }
 }

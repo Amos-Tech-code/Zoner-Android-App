@@ -6,24 +6,17 @@ import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
 import android.util.Size
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.PlayCircle
-import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -37,17 +30,32 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.zoner.android.util.getLegacyPathFromUri
+import java.io.File
 
 @Composable
 fun VideoThumbnail(
-    uri: Uri,
     modifier: Modifier = Modifier,
+    uri: Uri,
+    localPath: String? = null,
     context: Context = LocalContext.current,
-    onVideoPlayClicked: () -> Unit
+    showPlayButton: Boolean = true, // Parameter to control overlay visibility
+    onVideoPlayClicked: () -> Unit = {} // Default empty lambda for when play button is hidden
 ) {
-    val thumbnail by remember(uri) {
+    val thumbnail by remember(uri, localPath) {
         derivedStateOf {
             try {
+                // Using the direct local file path
+                localPath?.let { path ->
+                    val file = File(path)
+                    if (file.exists() && file.canRead()) {
+                        return@derivedStateOf ThumbnailUtils.createVideoThumbnail(
+                            path,
+                            MediaStore.Images.Thumbnails.MINI_KIND
+                        )?.asImageBitmap()
+                    }
+                }
+
+                // FALLBACK: Only if local path doesn't work, try URI approaches
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                     // Modern way using ContentResolver
                     context.contentResolver.loadThumbnail(
@@ -77,8 +85,7 @@ fun VideoThumbnail(
                 bitmap = it,
                 contentDescription = "Video thumbnail",
                 contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .fillMaxSize()
+                modifier = Modifier.fillMaxSize()
             )
         } ?: run {
             Box(
@@ -88,74 +95,23 @@ fun VideoThumbnail(
             )
         }
 
-        Box(
-            modifier = Modifier
-                .align(Alignment.Center)
-                .clip(CircleShape)
-                .clickable { onVideoPlayClicked() }
-                .padding(8.dp)
-                .background(Color.Black.copy(alpha = 0.5f), CircleShape),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = Icons.Default.PlayCircle,
-                contentDescription = "Video",
-                tint = Color.White.copy(alpha = 0.8f),
+        // Only show play button overlay if requested
+        if (showPlayButton) {
+            Box(
                 modifier = Modifier
-                    .size(48.dp)
-            )
-        }
-    }
-}
-
-
-
-@Composable
-fun MediaControlsOverlay(
-    showControls: Boolean,
-    onRemoveItem: () -> Unit,
-    isVideo: Boolean,
-    modifier: Modifier = Modifier
-) {
-    AnimatedVisibility(
-        visible = showControls,
-        enter = fadeIn(),
-        exit = fadeOut(),
-        modifier = modifier
-    ) {
-        Column {
-            // Remove button
-            IconButton(
-                onClick = onRemoveItem,
-                modifier = Modifier
+                    .align(Alignment.Center)
+                    .clip(CircleShape)
+                    .clickable { onVideoPlayClicked() }
                     .padding(8.dp)
-                    .background(Color.Black.copy(alpha = 0.5f), CircleShape)
-                    .size(36.dp)
+                    .background(Color.Black.copy(alpha = 0.5f), CircleShape),
+                contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    imageVector = Icons.Default.Close,
-                    contentDescription = "Remove media",
-                    tint = Color.White,
-                    modifier = Modifier.size(20.dp)
+                    imageVector = Icons.Default.PlayCircle,
+                    contentDescription = "Play video",
+                    tint = Color.White.copy(alpha = 0.8f),
+                    modifier = Modifier.size(48.dp)
                 )
-
-                // Video-specific controls
-                if (isVideo) {
-                    IconButton(
-                        onClick = { /* Handle video controls */ },
-                        modifier = Modifier
-                            .padding(8.dp)
-                            .background(Color.Black.copy(alpha = 0.5f), CircleShape)
-                            .size(36.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.VolumeUp,
-                            contentDescription = "Volume control",
-                            tint = Color.White,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                }
             }
         }
     }

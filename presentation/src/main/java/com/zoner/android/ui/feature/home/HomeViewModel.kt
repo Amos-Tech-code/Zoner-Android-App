@@ -9,17 +9,16 @@ import com.zoner.android.ui.feature.view_status.StatusViewingState
 import com.zoner.data.local.datastore.ZonerSession
 import com.zoner.domain.model.LocalUser
 import com.zoner.domain.model.MediaType
-import com.zoner.domain.model.UserRole
-import com.zoner.domain.usecase.StatusItemsUseCases
+import com.zoner.domain.repository.StatusRepository
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.receiveAsFlow
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 class HomeViewModel(
-   private val statusUseCase: StatusItemsUseCases,
+   private val repository: StatusRepository,
    private val session: ZonerSession
 ): ViewModel() {
 
@@ -43,32 +42,34 @@ class HomeViewModel(
    private fun observeUserFromLocal() {
       viewModelScope.launch {
          session.getUser().collect { user ->
-            if (user != null) {
-               loggedInUser = user
-            }
-         }
-      }
-   }
-   private fun loadStatuses() {
-      _uiState.value = HomeState.Loading
-      viewModelScope.launch {
-         try {
-             val result = statusUseCase.getUserStatus.invoke()
-            result.collect { group ->
-               _uiState.value = HomeState.Success(
-                  isBusinessAccount = true,
-                  userStatusItems = group.flatMap { it.statuses },
-                  otherStatus = getDummyStatus(),
-                  posts = getDummyPosts()
-               )
-            }
-         } catch (e: Exception) {
-            //Log.d("HomeViewModel", e.message.toString())
-            _uiState.value = HomeState.Error("Failed to retrieve posts. Please try again later.")
+            user?.let { loggedInUser = it }
          }
       }
    }
 
+   private fun loadStatuses() {
+      viewModelScope.launch {
+         repository.getUserStatusSummary()
+            .catch { e ->
+               _uiState.value = HomeState.Error("Failed to retrieve posts. Please try again later.")
+            }
+            .collect { result ->
+               _uiState.value = HomeState.Success(
+                  isBusinessAccount = loggedInUser?.isBusiness ?: false,
+                  userStatusSummary = MyStatusUiState(
+                     latestStatus = result.latestStatus,
+                     statusCount = result.totalCount,
+                     failed = result.countsByState["FAILED"] ?: 0,
+                     pending = result.countsByState["PENDING"] ?: 0,
+                     uploading = result.countsByState["UPLOADING"] ?: 0,
+                     uploaded = result.countsByState["UPLOADED"] ?: 0
+                  ),
+                  otherStatus = getDummyStatus(),
+                  posts = getDummyPosts()
+               )
+            }
+      }
+   }
     // Dummy Data Generators
     private fun getDummyUser(): User {
        return User(

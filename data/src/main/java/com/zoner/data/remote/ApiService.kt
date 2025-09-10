@@ -14,13 +14,17 @@ import com.zoner.data.dto.auth.ResendOtpResponseDto
 import com.zoner.data.dto.auth.ResetPasswordDto
 import com.zoner.data.dto.auth.VerifyEmailRequestDto
 import com.zoner.data.dto.business.CreateBusinessProfileDto
+import com.zoner.data.dto.status.StatusUploadResponseDto
 import okhttp3.MultipartBody
 import okhttp3.RequestBody
 import retrofit2.Response
 import retrofit2.http.Body
+import retrofit2.http.DELETE
 import retrofit2.http.Multipart
 import retrofit2.http.POST
+import retrofit2.http.PUT
 import retrofit2.http.Part
+import retrofit2.http.Path
 
 interface ApiService {
 
@@ -70,4 +74,31 @@ interface ApiService {
      */
     @POST("business/create")
     suspend fun createBusinessProfile(@Body request: CreateBusinessProfileDto) : Response<LoginResponseDto>
+
+
+    /**
+     * Status Implementation
+     */
+    @Multipart
+    @POST("status/upload")
+    suspend fun uploadStatus(
+        @Part("caption") caption: RequestBody?,
+        @Part("mediaType") mediaType: RequestBody,
+        @Part("durationMillis") durationMillis: RequestBody,
+        @Part mediaFile: MultipartBody.Part
+    ): Response<StatusUploadResponseDto>
+
+    @Multipart
+    @PUT("status/{id}")
+    suspend fun updateStatus(
+        @Path("id") statusId: String,
+        @Part("caption") caption: RequestBody?,
+        @Part("mediaType") mediaType: RequestBody,
+        @Part("durationMillis") durationMillis: RequestBody,
+        @Part mediaFile: MultipartBody.Part? = null
+    ) : Response<GenericResponseDto>
+
+    @DELETE("/status/{id}")
+    suspend fun deleteStatus(@Path("id") id: String) : Response<GenericResponseDto>
+
 }

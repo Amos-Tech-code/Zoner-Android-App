@@ -1,29 +1,38 @@
 package com.zoner.domain.repository
 
+import com.zoner.domain.model.MyStatus
+import com.zoner.domain.model.SaveUserStatus
 import com.zoner.domain.model.StatusGroup
-import com.zoner.domain.model.UserStatus
+import com.zoner.domain.model.UserStatusSummary
+import com.zoner.domain.model.request.RecordStatusInteraction
 import kotlinx.coroutines.flow.Flow
 
 interface StatusRepository {
-    suspend fun saveStatus(status: UserStatus)
+    suspend fun saveStatus(status: SaveUserStatus)
 
-    suspend fun getStatusGroups(): Flow<List<StatusGroup>>
+    suspend fun retryFailedStatuses()
 
-    suspend fun getPendingStatuses(): List<UserStatus>
+    suspend fun updateStatus(status: MyStatus)
 
-    suspend fun getStatusById(id: String): UserStatus?
+    suspend fun fetchUserStatusGroupFromLocal(): Flow<List<StatusGroup>>
 
-    suspend fun updateStatus(status: UserStatus)
+    suspend fun getUserStatusSummary(): Flow<UserStatusSummary>
+
+    suspend fun fetchOtherUsersStatusFromServer(): Flow<List<StatusGroup>>
+
+    suspend fun fetchOtherUsersStatusFromLocal(): Flow<List<StatusGroup>>
+
+    suspend fun downloadStatusMedia(statusId: String)
+
+    suspend fun recordInteraction(interaction: RecordStatusInteraction)
 
     suspend fun deleteStatus(id: String)
 
     suspend fun cleanExpiredStatuses() : Int
 
-    suspend fun markStatusAsViewed(statusId: String)
-
     // Testing
     suspend fun getStatusCount() : Int
 
-    suspend fun getExpiredStatusCount(expiryTime: Long) : Int
+    suspend fun getExpiredStatusCount() : Int
 
 }

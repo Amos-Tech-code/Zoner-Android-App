@@ -40,3 +40,11 @@ fun Long.toRelativeTime(): String {
         else -> "${seconds / 2592000}mo"
     }
 }
+
+// Extension function for duration formatting
+fun Long.toRelativeDuration() : String {
+    val seconds = this / 1000
+    val minutes = seconds / 60
+    val remainingSeconds = seconds % 60
+    return String.format("%d:%02d", minutes, remainingSeconds)
+}

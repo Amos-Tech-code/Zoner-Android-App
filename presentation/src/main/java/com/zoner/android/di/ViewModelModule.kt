@@ -18,6 +18,7 @@ import com.zoner.android.ui.feature.account.complete_profile.CompleteProfileView
 import com.zoner.android.ui.feature.post_details.PostDetailsViewModel
 import com.zoner.android.ui.feature.settings.SettingsViewModel
 import com.zoner.android.ui.feature.view_status.StatusViewerViewModel
+import com.zoner.android.ui.feature.view_status.user_status.ViewUserStatusViewModel
 import org.koin.core.module.dsl.viewModel
 import org.koin.dsl.module
 
@@ -39,5 +40,6 @@ val viewModelModule  = module {
     viewModel { CreateBusinessProfileViewModel(get(), get()) }
     viewModel { SettingsViewModel(get()) }
     viewModel { PostDetailsViewModel() }
+    viewModel { ViewUserStatusViewModel(get()) }
     viewModel { StatusViewerViewModel(get()) }
 }

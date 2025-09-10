@@ -14,8 +14,8 @@ import com.zoner.domain.model.Audience
 import com.zoner.domain.model.LocalUser
 import com.zoner.domain.model.MediaType
 import com.zoner.domain.model.PostType
-import com.zoner.domain.model.UserStatus
-import com.zoner.domain.usecase.StatusItemsUseCases
+import com.zoner.domain.model.SaveUserStatus
+import com.zoner.domain.repository.StatusRepository
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -23,13 +23,12 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import java.util.UUID
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 
 class AddPostViewModel(
-    private val statusItemsUseCases: StatusItemsUseCases,
     private val session: ZonerSession,
+    private val statusRepository: StatusRepository,
     private val context: Context
 ) : ViewModel() {
 
@@ -239,7 +238,7 @@ class AddPostViewModel(
                 _statusFormState.update { it.copy(isLoading = true) }
 
                 val currentTime = Clock.System.now()
-                val savedStatuses = mutableListOf<UserStatus>()
+                val savedStatuses = mutableListOf<SaveUserStatus>()
 
                 statusFormState.value.data.forEach { status ->
                     status.media?.let { uri ->
@@ -250,19 +249,15 @@ class AddPostViewModel(
                                 else -> throw IllegalArgumentException("Unsupported media type")
                             }
 
-                            val userStatus = UserStatus(
-                                id = UUID.randomUUID().toString(),
+                            val userStatus = SaveUserStatus(
                                 mediaUri = uri,
                                 mediaType = mediaType,
                                 caption = status.caption,
                                 createdAt = currentTime,
-                                state = StatusState.Pending,
-                                userId = "",
-                                userName = "",
-                                userAvatar = "",
+                                state = StatusState.Pending
                             )
 
-                            statusItemsUseCases.saveUserStatus(userStatus)
+                            statusRepository.saveStatus(userStatus)
                             savedStatuses.add(userStatus)
                         } catch (e: Exception) {
                             //Log.e("AddPostViewModel", "Error saving status", e)
@@ -277,7 +272,7 @@ class AddPostViewModel(
                             savedStatuses.any { saved -> saved.mediaUri == it.media }
                         })
                     }
-                    _event.send(AddPostEvent.ShowSuccessMessage("Saved ${savedStatuses.size} statuses"))
+                    _event.send(AddPostEvent.ShowSuccessMessage("Saved ${savedStatuses.size} statuses. They will upload shortly."))
                 }
             } catch (e: Exception) {
                 _event.send(AddPostEvent.ShowErrorMessage("Failed to save status items"))

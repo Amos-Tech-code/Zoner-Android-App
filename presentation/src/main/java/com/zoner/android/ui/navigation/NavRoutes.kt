@@ -50,3 +50,6 @@ object PostDetailsRoute : NavRoutes
 
 @Serializable
 object StatusViewRoute : NavRoutes
+
+@Serializable
+object UserStatusRoute : NavRoutes

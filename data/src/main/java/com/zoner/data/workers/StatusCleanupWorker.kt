@@ -19,37 +19,45 @@ import kotlin.time.ExperimentalTime
 class StatusCleanupWorker(
     context: Context,
     workerParams: WorkerParameters,
-    private val statusRepository: StatusRepository? // Inject directly
+    private val statusRepository: StatusRepository? = null
 ) : CoroutineWorker(context, workerParams) {
 
+    private val TAG = "StatusCleanupWorker"
+
+    // ✅ fallback constructor (for reflection case)
+    constructor(context: Context, workerParams: WorkerParameters) :
+            this(context, workerParams, null)
+
+    // ✅ always resolve repository (DI first, fallback to lazy Koin lookup)
     private val repository: StatusRepository by lazy {
         statusRepository ?: getKoin().get()
     }
 
-    @OptIn(ExperimentalTime::class)
     override suspend fun doWork(): Result {
         return try {
-            val expiryTime = Clock.System.now().minus(24.hours).toEpochMilliseconds()
-            val expiredCount = repository.getExpiredStatusCount(expiryTime)
+            val expiredCount = repository.getExpiredStatusCount()
 
             if (expiredCount == 0) {
-                Log.d("StatusCleanupWorker", "No expired statuses found - skipping cleanup")
+                Log.d(TAG, "No expired statuses found - skipping cleanup")
                 return Result.success() // Success with no work needed
             }
 
-            Log.d("StatusCleanupWorker", "Found $expiredCount expired statuses - proceeding with cleanup")
+            Log.d(TAG, "Found $expiredCount expired statuses - proceeding with cleanup")
 
             val deletedCount = repository.cleanExpiredStatuses()
 
-            Log.d("StatusCleanupWorker", "Successfully cleaned up $deletedCount expired statuses")
+            Log.d(TAG, "Successfully cleaned up $deletedCount expired statuses")
             Result.success()
         } catch (e: Exception) {
-            Log.e("StatusCleanupWorker", "Cleanup failed", e)
+            Log.e(TAG, "Cleanup failed", e)
             Result.retry()
         }
     }
 
     companion object {
+
+        private const val UNIQUE_WORK_NAME = "status_cleanup"
+
         fun enqueue(context: Context) {
             val constraints = Constraints.Builder()
                 .setRequiredNetworkType(NetworkType.NOT_REQUIRED)
@@ -57,46 +65,19 @@ class StatusCleanupWorker(
                 .build()
 
             val request = PeriodicWorkRequestBuilder<StatusCleanupWorker>(
-//                15, TimeUnit.MINUTES, // Minimum interval
-//                5, TimeUnit.MINUTES   // Minimum flex
-                12, TimeUnit.HOURS, // More frequent checks (minimum interval)
+                24, TimeUnit.HOURS,
                 3, TimeUnit.HOURS    // Flex interval
             )
                 .setConstraints(constraints)
-                .addTag("status_cleanup")
+                .addTag(UNIQUE_WORK_NAME)
                 .build()
 
             WorkManager.getInstance(context).enqueueUniquePeriodicWork(
-                "status_cleanup",
-                ExistingPeriodicWorkPolicy.UPDATE, // Update existing work
+                UNIQUE_WORK_NAME,
+                ExistingPeriodicWorkPolicy.KEEP,
                 request
             )
         }
 
-//        internal fun enqueueTestWorker(context: Context) {
-//            Log.d("StatusCleanupWorker", "Enqueuing TEST worker")
-//
-//            // No constraints for testing
-//            val constraints = Constraints.Builder()
-//                .setRequiredNetworkType(NetworkType.NOT_REQUIRED)
-//                .build()
-//
-//            val request = OneTimeWorkRequestBuilder<StatusCleanupWorker>()
-//                .setConstraints(constraints)
-//                .addTag("status_cleanup_test")
-//                .build()
-//
-//            WorkManager.getInstance(context).enqueue(request)
-//
-//            // Monitor the worker's progress
-//            WorkManager.getInstance(context)
-//                .getWorkInfoByIdLiveData(request.id)
-//                .observeForever { workInfo ->
-//                    Log.d("WorkerTest", "Worker state: ${workInfo?.state}")
-//                    if (workInfo?.state == WorkInfo.State.FAILED) {
-//                        Log.e("WorkerTest", "Worker failed: ${workInfo.outputData}")
-//                    }
-//                }
-//        }
     }
 }
