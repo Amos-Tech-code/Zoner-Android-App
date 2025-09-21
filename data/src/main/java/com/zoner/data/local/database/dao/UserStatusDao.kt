@@ -15,6 +15,9 @@ interface UserStatusDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertStatus(status: UserStatusEntity)
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertStatuses(statuses: List<UserStatusEntity>)
+
     @Query("SELECT * FROM user_status ORDER BY createdAt ASC")
     fun getUserStatuses(): Flow<List<UserStatusEntity>>
 

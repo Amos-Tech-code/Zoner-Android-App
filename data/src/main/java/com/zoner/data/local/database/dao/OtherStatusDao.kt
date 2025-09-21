@@ -12,6 +12,16 @@ interface OtherStatusDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(status: OtherUserStatusEntity)
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAll(statuses: List<OtherUserStatusEntity>)
+
+    @Query("""
+        SELECT * FROM other_user_status 
+        WHERE expiresAt > strftime('%s','now') * 1000
+        ORDER BY createdAt DESC
+    """)
+    fun getAllStatuses(): Flow<List<OtherUserStatusEntity>>
+
     @Query("SELECT * FROM other_user_status ORDER BY createdAt DESC")
     fun getAll(): Flow<List<OtherUserStatusEntity>>
 

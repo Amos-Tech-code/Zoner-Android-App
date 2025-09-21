@@ -18,11 +18,13 @@ import com.zoner.data.local.datastore.ZonerSession
 import com.zoner.data.utils.MediaUtils
 import com.zoner.data.workers.StatusCleanupWorker
 import com.zoner.data.workers.StatusSyncWorker
+import com.zoner.domain.ResultWrapper
 import com.zoner.domain.StatusState
 import com.zoner.domain.model.InteractionType
 import com.zoner.domain.model.LocalUser
 import com.zoner.domain.model.MediaType
 import com.zoner.domain.model.MyStatus
+import com.zoner.domain.model.OtherStatusSummary
 import com.zoner.domain.model.OtherUserStatus
 import com.zoner.domain.model.SaveUserStatus
 import com.zoner.domain.model.StatusGroup
@@ -142,6 +144,23 @@ class StatusRepositoryImpl (
         }.flowOn(dispatchers)
     }
 
+    override suspend fun fetchUserStatusGroupFromServer() {
+        try {
+            when (val response = networkService.getUserStatuses()) {
+                is ResultWrapper.Success -> {
+                    val entities = response.value.map { it.toEntity() }
+                    userStatusDao.insertStatuses(entities)
+                }
+                is ResultWrapper.Failure -> {
+                    Log.e("StatusRepository", "Server error: ${response.exception}")
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("StatusRepository", "Failed to fetch user status", e)
+        }
+    }
+
+
     override suspend fun getUserStatusSummary(): Flow<UserStatusSummary> {
         return combine(
             userStatusDao.getStatusCountFlow(),
@@ -156,45 +175,27 @@ class StatusRepositoryImpl (
         }.flowOn(dispatchers)
     }
 
+    override suspend fun getOtherUserStatusSummary(): Flow<List<OtherStatusSummary>> {
+        return otherStatusDao.getAllStatuses()
+            .map { entities -> entities.toSummaryList() }
+            .flowOn(dispatchers)
+    }
+
     // For other users' statuses from Server
-    @OptIn(ExperimentalTime::class)
-    override suspend fun fetchOtherUsersStatusFromServer(): Flow<List<StatusGroup>> {
-        return withContext(dispatchers) {
-            try {
-                // Fetch from server
-                val statusGroupsFromServer = networkService.getOtherUsersStatuses()
-
-                // Save to local database
-                statusGroupsFromServer.forEach { group ->
-                    group.statuses.forEach { status ->
-                        val entity = OtherUserStatusEntity(
-                            id = status.id, //status.serverId
-                            userId = group.authorId,
-                            userName = group.authorName,
-                            userAvatar = group.authorAvatar,
-                            mediaUri = status.mediaUri.toString(),
-                            caption = status.caption,
-                            mediaType = status.mediaType.name,
-                            createdAt = status.createdAt.toEpochMilliseconds(),
-                            localPath = null,
-                            isViewed = false,
-                            isDownloaded = false,
-                            blurHash = "",//status.blurHash,
-                            durationMillis = 0L,//status.durationMillis,
-                            expiresAt = status.expiresAt?.toEpochMilliseconds()
-                                ?: (status.createdAt + 24.hours).toEpochMilliseconds(),
-                            lastUpdated = null,
-                            deleted = false,
-                        )
-                        otherStatusDao.insert(entity)
-                    }
+    override suspend fun fetchOtherUsersStatusFromServer() {
+        try {
+            when (val result = networkService.getOtherUsersStatuses()) {
+                is ResultWrapper.Success -> {
+                    val entities = result.value.statusGroups
+                        .flatMap { group -> group.statuses.map { it.toEntity(group) } }
+                    otherStatusDao.insertAll(entities)
                 }
-
-                fetchOtherUsersStatusFromLocal()
-            } catch (e: Exception) {
-                Log.e("StatusRepository", "Failed to fetch other users' statuses", e)
-                fetchOtherUsersStatusFromLocal() // Return cached data if available
+                is ResultWrapper.Failure -> {
+                    Log.e("StatusRepository", "Failed: ${result.exception}")
+                }
             }
+        } catch (e: Exception) {
+            Log.e("StatusRepository", "Failed to fetch other users’ statuses", e)
         }
     }
 
@@ -422,6 +423,20 @@ class StatusRepositoryImpl (
         )
     }
 
+    suspend fun List<OtherUserStatusEntity>.toSummaryList(): List<OtherStatusSummary> {
+        return this
+            .groupBy { it.userId }
+            .map { (_, statuses) ->
+                val latest = statuses.maxByOrNull { it.createdAt }
+                OtherStatusSummary(
+                    latestStatus = latest?.toOtherUserStatus(),
+                    statusCount = statuses.size,
+                    viewedCount = statuses.count { it.isViewed },
+                    authorName = latest?.userName.orEmpty(),
+                    authorId = latest?.userId.orEmpty()
+                )
+            }
+    }
     @OptIn(ExperimentalTime::class)
     private suspend fun OtherUserStatusEntity.toOtherUserStatus(): OtherUserStatus {
         return OtherUserStatus(

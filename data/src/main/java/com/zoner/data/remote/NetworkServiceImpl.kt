@@ -25,8 +25,10 @@ import com.zoner.domain.model.request.RegisterRequest
 import com.zoner.domain.model.request.ResetPasswordRequest
 import com.zoner.domain.model.response.GenericResponse
 import com.zoner.domain.model.response.LoginResponse
+import com.zoner.domain.model.response.OtherUserStatusResponse
 import com.zoner.domain.model.response.RegisterResponse
 import com.zoner.domain.model.response.ResendOtpResponse
+import com.zoner.domain.model.response.StatusResponse
 import com.zoner.domain.model.response.StatusUploadResponse
 import com.zoner.domain.model.response.UsernameAvailability
 import com.zoner.domain.network.ConnectivityObserver
@@ -318,12 +320,29 @@ class NetworkServiceImpl(
     }
 
 
-    override suspend fun getUserStatuses(): List<StatusGroup> {
-        TODO("Not yet implemented")
+    override suspend fun getUserStatuses():  ResultWrapper<List<StatusResponse>> {
+        return safeApiCall {
+            val response = apiService.fetchUserStatus()
+
+            if (response.isSuccessful) {
+                val body = response.body() ?: throw IOException(emptyResponseMessage)
+                body.toDomain()
+            } else {
+                throw HttpException(response)
+            }
+        }
     }
 
-    override suspend fun getOtherUsersStatuses(): List<StatusGroup> {
-        TODO("Not yet implemented")
+    override suspend fun getOtherUsersStatuses(): ResultWrapper<OtherUserStatusResponse> {
+        return safeApiCall {
+            val response = apiService.fetchOtherUserStatuses(null, null)
+            if (response.isSuccessful) {
+                val body = response.body() ?: throw IOException(emptyResponseMessage)
+                body.toDomain()
+            } else {
+                throw HttpException(response)
+            }
+        }
     }
 
     override suspend fun downloadStatusMedia(serverId: String): ByteArray {

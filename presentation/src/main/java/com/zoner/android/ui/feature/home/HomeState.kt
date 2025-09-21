@@ -8,7 +8,7 @@ sealed class HomeState {
     data class Success(
         val isBusinessAccount: Boolean = false,
         val userStatusSummary: MyStatusUiState,
-        val otherStatus: List<Status> = emptyList(),
+        val otherStatusSummary: List<OtherUserStatusUiState>,
         val posts: List<Post> = emptyList(),
     ) : HomeState()
     data class Error(val message: String) : HomeState()
@@ -21,4 +21,12 @@ data class MyStatusUiState(
     val pending: Int = 0,
     val uploading: Int = 0,
     val uploaded: Int = 0,
+)
+
+data class OtherUserStatusUiState(
+    val latestStatus: BaseStatus? = null,
+    val statusCount: Int = 0,
+    val viewedCount: Int = 0,
+    val authorName: String = "",
+    val authorId: String = ""
 )

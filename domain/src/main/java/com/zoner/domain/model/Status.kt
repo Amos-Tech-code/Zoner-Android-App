@@ -6,7 +6,7 @@ import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
-// Generic StatusGroup that can contain both MyStatus and OtherUserStatus
+// Generic StatusGroup that can contain both UserStatus and OtherUserStatus
 @OptIn(ExperimentalTime::class)
 data class StatusGroup(
     val authorId: String,
@@ -107,4 +107,12 @@ data class UserStatusSummary(
     val totalCount: Int,
     val latestStatus: BaseStatus?,
     val countsByState: Map<String, Int>
+)
+
+data class OtherStatusSummary(
+    val latestStatus: BaseStatus?,
+    val statusCount: Int,
+    val viewedCount: Int,
+    val authorName: String,
+    val authorId: String
 )

@@ -12,8 +12,10 @@ import com.zoner.domain.model.request.RegisterRequest
 import com.zoner.domain.model.request.ResetPasswordRequest
 import com.zoner.domain.model.response.GenericResponse
 import com.zoner.domain.model.response.LoginResponse
+import com.zoner.domain.model.response.OtherUserStatusResponse
 import com.zoner.domain.model.response.RegisterResponse
 import com.zoner.domain.model.response.ResendOtpResponse
+import com.zoner.domain.model.response.StatusResponse
 import com.zoner.domain.model.response.StatusUploadResponse
 import com.zoner.domain.model.response.UsernameAvailability
 
@@ -55,9 +57,9 @@ interface NetworkService {
      */
     suspend fun uploadStatus(status: SaveUserStatus): ResultWrapper<StatusUploadResponse>
 
-    suspend fun getUserStatuses(): List<StatusGroup>
+    suspend fun getUserStatuses(): ResultWrapper<List<StatusResponse>>
 
-    suspend fun getOtherUsersStatuses(): List<StatusGroup>
+    suspend fun getOtherUsersStatuses(): ResultWrapper<OtherUserStatusResponse>
 
     suspend fun downloadStatusMedia(serverId: String): ByteArray
 

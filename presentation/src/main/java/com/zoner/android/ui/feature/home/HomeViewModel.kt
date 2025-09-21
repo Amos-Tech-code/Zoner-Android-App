@@ -10,10 +10,12 @@ import com.zoner.data.local.datastore.ZonerSession
 import com.zoner.domain.model.LocalUser
 import com.zoner.domain.model.MediaType
 import com.zoner.domain.repository.StatusRepository
+import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 
@@ -31,13 +33,26 @@ class HomeViewModel(
 
    private val _event = Channel<HomeEvent>()
    val event = _event.receiveAsFlow()
-
    var loggedInUser: LocalUser? = null
 
-    init {
-       observeUserFromLocal()
-       loadStatuses()
-    }
+   init {
+      //populateStatuses()
+      observeUserFromLocal()
+      loadStatuses()
+   }
+
+   private fun populateStatuses() {
+       try {
+           viewModelScope.launch {
+              val userStatuses = async{ repository.fetchUserStatusGroupFromServer() }
+              val otherUserStatuses = async { repository.fetchOtherUsersStatusFromServer() }
+              userStatuses.await()
+              otherUserStatuses.await()
+           }
+       } catch (e: Exception) {
+
+       }
+   }
 
    private fun observeUserFromLocal() {
       viewModelScope.launch {
@@ -49,27 +64,39 @@ class HomeViewModel(
 
    private fun loadStatuses() {
       viewModelScope.launch {
-         repository.getUserStatusSummary()
-            .catch { e ->
-               _uiState.value = HomeState.Error("Failed to retrieve posts. Please try again later.")
-            }
-            .collect { result ->
-               _uiState.value = HomeState.Success(
-                  isBusinessAccount = loggedInUser?.isBusiness ?: false,
-                  userStatusSummary = MyStatusUiState(
-                     latestStatus = result.latestStatus,
-                     statusCount = result.totalCount,
-                     failed = result.countsByState["FAILED"] ?: 0,
-                     pending = result.countsByState["PENDING"] ?: 0,
-                     uploading = result.countsByState["UPLOADING"] ?: 0,
-                     uploaded = result.countsByState["UPLOADED"] ?: 0
-                  ),
-                  otherStatus = getDummyStatus(),
-                  posts = getDummyPosts()
-               )
-            }
+         combine(
+            repository.getUserStatusSummary(),
+            repository.getOtherUserStatusSummary()
+         ) { mySummary, otherSummaries ->
+            HomeState.Success(
+               isBusinessAccount = loggedInUser?.isBusiness ?: false,
+               userStatusSummary = MyStatusUiState(
+                  latestStatus = mySummary.latestStatus,
+                  statusCount = mySummary.totalCount,
+                  failed = mySummary.countsByState["FAILED"] ?: 0,
+                  pending = mySummary.countsByState["PENDING"] ?: 0,
+                  uploading = mySummary.countsByState["UPLOADING"] ?: 0,
+                  uploaded = mySummary.countsByState["UPLOADED"] ?: 0
+               ),
+               otherStatusSummary = otherSummaries.map {
+                  OtherUserStatusUiState(
+                     latestStatus = it.latestStatus,
+                     statusCount = it.statusCount,
+                     viewedCount = it.viewedCount,
+                     authorName = it.authorName,
+                     authorId = it.authorId
+                  )
+               },
+               posts = getDummyPosts()
+            )
+         }.catch { e ->
+            _uiState.value = HomeState.Error("Failed to retrieve posts. Please try again later.")
+         }.collect { state ->
+            _uiState.value = state
+         }
       }
    }
+
     // Dummy Data Generators
     private fun getDummyUser(): User {
        return User(
@@ -203,110 +230,9 @@ class HomeViewModel(
        )
     }
 
-    private fun getDummyStatus(): List<Status> {
-       val author = getDummyUser()
-       return listOf(
-          Status(
-             id = "status_1",
-             content = "📢 New Feature Alert: Dark mode is now live! #ZonerUpdate",
-             likes = 230,
-             replies = 10,
-             timestamp = System.currentTimeMillis() - 2 * 3600000, // 2 hrs ago
-             isLiked = true,
-             author = User(name = "Magunas"),
-             media = listOf(
-                Media("https://picsum.photos/400/400?random=25", MediaType.IMAGE),
-                Media("https://picsum.photos/200/200?random=2", MediaType.IMAGE),
-
-             ),
-             isViewed = true,
-          ),
-          Status(
-             id = "status_2",
-             content = "💼 We’re hiring! Join the Zoner team and build the future.",
-             likes = 89,
-             replies = 4,
-             timestamp = System.currentTimeMillis() - 6 * 3600000,
-             isLiked = true,
-             author = User(name = "QuickMart"),
-             media = listOf(
-                Media("https://picsum.photos/300/300?random=28", MediaType.IMAGE)
-             ),
-             isViewed = false,
-          ),
-          Status(
-             id = "status_3",
-             content = "🎉 Weekend sale: Get 20% off all subscriptions!",
-             likes = 342,
-             replies = 15,
-             timestamp = System.currentTimeMillis() - 3 * 24 * 3600000,
-             isLiked = false,
-             author = User(name = "Naivas"),
-             media = listOf(
-                Media("https://picsum.photos/200/200?random=2", MediaType.IMAGE),
-             ),
-             isViewed = false,
-          ),
-          Status(
-             id = "status_4",
-             content = "📚 Mastering Jetpack Compose animations. A must read!",
-             likes = 543,
-             replies = 12,
-             timestamp = System.currentTimeMillis() - 24 * 3600000,
-             isLiked = false,
-             author = User(name = "Magunas"),
-             media = listOf(
-                Media("https://picsum.photos/300/300?random=28", MediaType.IMAGE)
-             ),
-             isViewed = false,
-          ),
-          Status(
-             id = "status_5",
-             content = "🍜 This ramen recipe changed my life!",
-             likes = 230,
-             replies = 10,
-             timestamp = System.currentTimeMillis() - 2 * 3600000, // 2 hrs ago
-             isLiked = true,
-             author = User(name = "Citadel hardware and metals"),
-             media = listOf(
-                Media("https://picsum.photos/400/400?random=25", MediaType.IMAGE),
-                Media("https://picsum.photos/200/200?random=2", MediaType.IMAGE),
-                Media("https://picsum.photos/200/200?random=2", MediaType.IMAGE),
-             ),
-             isViewed = false,
-          ),
-          Status(
-             id = "status_6",
-             content = "🚀 Building fast Kotlin APIs with Ktor",
-             likes = 230,
-             replies = 8,
-             timestamp = System.currentTimeMillis() - 48 * 3600000,
-             isLiked = false,
-             author = User(name = "Maestro"),
-             media = listOf(
-                Media("https://picsum.photos/200/200?random=2", MediaType.IMAGE),
-                Media("https://picsum.photos/400/400?random=25", MediaType.IMAGE)
-             ),
-             isViewed = false,
-          )
-       )
-    }
-
    fun retry() {
       loadStatuses()
    }
 
 
 }
-
-data class Status(
-   val id: String,
-   val likes: Int,
-   val timestamp: Long,
-   val content: String,
-   val replies: Int,
-   val isLiked: Boolean,
-   val author: User,
-   val media: List<Media>, // Max 4 items
-   val isViewed: Boolean
-)

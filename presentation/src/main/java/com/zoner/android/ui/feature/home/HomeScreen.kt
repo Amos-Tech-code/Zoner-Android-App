@@ -92,6 +92,7 @@ import com.zoner.android.ui.designSystem.VideoThumbnail
 import com.zoner.android.ui.designSystem.ZonerAsyncImage
 import com.zoner.android.ui.feature.profile.Post
 import com.zoner.android.ui.navigation.PostDetailsRoute
+import com.zoner.android.ui.navigation.StatusViewRoute
 import com.zoner.android.ui.navigation.UserStatusRoute
 import com.zoner.android.ui.theme.ZonerInfo
 import com.zoner.android.util.ObserveAsEvents
@@ -123,13 +124,13 @@ fun HomeScreen(
             HomeScreenTopBar(
                 scrollBehavior = scrollBehavior,
                 myStatusUiState = (state as? HomeState.Success)?.userStatusSummary ?: MyStatusUiState(),
-                otherStatus = (state as? HomeState.Success)?.otherStatus ?: emptyList(),
+                otherStatus = (state as? HomeState.Success)?.otherStatusSummary ?: emptyList(),
                 isBusinessAccount = (state as? HomeState.Success)?.isBusinessAccount ?: false,
                 user = viewModel.loggedInUser,
                 isLoading = isLoading,
                 onAddPostClick = onNavigateToAddPost,
                 onAddStatusClick = onNavigateToAddStatus,
-                onStatusClicked = {},
+                onStatusClicked = { navController.navigate(StatusViewRoute) },
                 onMyStatusClick = { navController.navigate(UserStatusRoute) },
                 modifier = Modifier.fillMaxWidth()
             )
@@ -224,12 +225,12 @@ private fun HomeScreenTopBar(
     modifier: Modifier = Modifier,
     scrollBehavior: TopAppBarScrollBehavior,
     myStatusUiState: MyStatusUiState,
-    otherStatus: List<Status>,
+    otherStatus: List<OtherUserStatusUiState>,
     isBusinessAccount: Boolean,
     isLoading: Boolean,
     user: LocalUser?,
     onAddPostClick: () -> Unit,
-    onStatusClicked: (Status) -> Unit,
+    onStatusClicked: () -> Unit,
     onMyStatusClick: () -> Unit,
     onAddStatusClick: () -> Unit,
 ) {
@@ -245,7 +246,7 @@ private fun HomeScreenTopBar(
                     )
                 } else {
                     StatusItems(
-                        otherStatus = otherStatus,
+                        otherStatusUiState = otherStatus,
                         myStatusUiState = myStatusUiState,
                         isBusinessAccount = isBusinessAccount,
                         onAddStatusClick = onAddStatusClick,
@@ -325,10 +326,10 @@ private fun HomeScreenHeader(
 @Composable
 private fun StatusItems(
     myStatusUiState: MyStatusUiState,
-    otherStatus: List<Status>,
+    otherStatusUiState: List<OtherUserStatusUiState>,
     isBusinessAccount: Boolean,
     onAddStatusClick: () -> Unit,
-    onStatusClicked: (Status) -> Unit,
+    onStatusClicked: () -> Unit,
     onMyStatusClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -345,103 +346,34 @@ private fun StatusItems(
         }
         if (myStatusUiState.latestStatus != null) {
             item {
-                UStatusItem(
+                UserStatusItem(
                     state = myStatusUiState,
                     onClick = { onMyStatusClick() }
                 )
             }
         }
-        items(otherStatus, key = { it.id}) { status ->
-            StatusItem(
-                status = status,
-                onClick = { onStatusClicked(status) }
-            )
-        }
-    }
-}
-
-
-@Composable
-fun PostsList(
-    posts: List<Post>,
-    onPostClick: (Post) -> Unit,
-    onMoreItemsClick: (Post) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val listState = rememberLazyListState()
-    var trackHeightPx by remember { mutableIntStateOf(0) }
-
-    val scrollProgress by remember {
-        derivedStateOf {
-            val firstVisibleItem = listState.firstVisibleItemIndex
-            val totalItems = listState.layoutInfo.totalItemsCount
-            if (totalItems > 1)
-                (firstVisibleItem.toFloat() / (totalItems - 1)).coerceIn(0f, 1f)
-            else 0f
-        }
-    }
-
-    // Animate the thumb position
-    val animatedProgress by animateFloatAsState(
-        targetValue = scrollProgress,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessLow
-        ),
-        label = "ScrollProgressAnimation"
-    )
-
-    Box(modifier = modifier.fillMaxSize()) {
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            state = listState
-        ) {
-            items(posts, key = { item -> item.id }) { post ->
-                PostItem(
-                    post = post,
-                    onPostClick = { onPostClick(post) },
-                    onMoreItemsClick = { onMoreItemsClick(post) }
+        if (otherStatusUiState.isNotEmpty()) {
+            items(otherStatusUiState, key = { it.authorId }) { status ->
+                StatusItem(
+                    state = status,
+                    onClick = { onStatusClicked() }
                 )
-                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
             }
         }
-
-        // Custom scrollbar
-        Box(
-            modifier = Modifier
-                .fillMaxHeight()
-                .width(6.dp)
-                .align(Alignment.CenterEnd)
-                .padding(vertical = 12.dp)
-                .onGloballyPositioned { layoutCoordinates ->
-                    trackHeightPx = layoutCoordinates.size.height
-                }
-        ) {
-            // Scroll thumb
-            val thumbHeightPx = with(LocalDensity.current) { 40.dp.toPx() }
-            val offsetY = ((trackHeightPx - thumbHeightPx) * animatedProgress).toInt()
-
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(80.dp)
-                    .offset { IntOffset(x = 0, y = offsetY) }
-                    .background(Color.Gray, RoundedCornerShape(3.dp))
-            )
-        }
     }
 }
 
+
 @Composable
-private fun UStatusItem(
+private fun UserStatusItem(
     modifier: Modifier = Modifier,
     state: MyStatusUiState,
     onClick: () -> Unit
 ) {
-    // Determine border color based on state
+    // Determine border color based on state - UPLOADING has highest priority
     val borderColor = when {
-        state.failed > 0 -> MaterialTheme.colorScheme.error
         state.uploading > 0 -> MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
+        state.failed > 0 -> MaterialTheme.colorScheme.error
         else -> MaterialTheme.colorScheme.primary
     }
 
@@ -537,10 +469,38 @@ private fun UStatusItem(
                     .clickable { onClick() },
                 contentAlignment = Alignment.Center
             ) {
-                // Show error/uploading indicators or content
+                // Show indicators - UPLOADING has highest priority
                 when {
+                    state.uploading > 0 -> {
+                        // Uploading state (highest priority)
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+
+                        // Badge showing count of uploading statuses
+                        if (state.uploading > 1) {
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.BottomEnd)
+                                    .size(16.dp)
+                                    .clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.primary)
+                            ) {
+                                Text(
+                                    text = if (state.uploading > 9) "9+" else state.uploading.toString(),
+                                    color = MaterialTheme.colorScheme.onPrimary,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontSize = 9.sp,
+                                    modifier = Modifier.align(Alignment.Center)
+                                )
+                            }
+                        }
+                    }
+
                     state.failed > 0 -> {
-                        // Error state
+                        // Error state (second priority)
                         Icon(
                             Icons.Outlined.ErrorOutline,
                             contentDescription = "Failed to upload",
@@ -560,34 +520,6 @@ private fun UStatusItem(
                                 Text(
                                     text = if (state.failed > 9) "9+" else state.failed.toString(),
                                     color = MaterialTheme.colorScheme.onError,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontSize = 9.sp,
-                                    modifier = Modifier.align(Alignment.Center)
-                                )
-                            }
-                        }
-                    }
-
-                    state.uploading > 0 -> {
-                        // Uploading state
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(20.dp),
-                            strokeWidth = 2.dp,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-
-                        // Badge showing count of uploading statuses
-                        if (state.uploading > 1) {
-                            Box(
-                                modifier = Modifier
-                                    .align(Alignment.BottomEnd)
-                                    .size(16.dp)
-                                    .clip(CircleShape)
-                                    .background(MaterialTheme.colorScheme.primary)
-                            ) {
-                                Text(
-                                    text = if (state.uploading > 9) "9+" else state.uploading.toString(),
-                                    color = MaterialTheme.colorScheme.onPrimary,
                                     style = MaterialTheme.typography.labelSmall,
                                     fontSize = 9.sp,
                                     modifier = Modifier.align(Alignment.Center)
@@ -662,8 +594,8 @@ private fun UStatusItem(
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             color = when {
-                state.failed > 0 -> MaterialTheme.colorScheme.error
                 state.uploading > 0 -> MaterialTheme.colorScheme.primary
+                state.failed > 0 -> MaterialTheme.colorScheme.error
                 else -> MaterialTheme.colorScheme.onSurface
             }
         )
@@ -673,40 +605,126 @@ private fun UStatusItem(
 
 @Composable
 private fun StatusItem(
-     modifier: Modifier = Modifier,
-     status: Status,
-     onClick: () -> Unit
+    modifier: Modifier = Modifier,
+    state: OtherUserStatusUiState,
+    onClick: () -> Unit
 ) {
-    val backgroundColor = if (status.isViewed) MaterialTheme.colorScheme.background else MaterialTheme.colorScheme.primary
+    // Determine border colors based on viewed state
+    val unviewedColor = MaterialTheme.colorScheme.primary
+    val viewedColor = MaterialTheme.colorScheme.background
+    val baseCircleColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
 
     Column(
         modifier = modifier
-            .size(70.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
+            .width(70.dp)
+            .wrapContentHeight(),
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Box(
-            modifier = Modifier
-                .size(60.dp)
-                .clip(CircleShape)
-                .border(width = 2.dp, color = backgroundColor, shape = CircleShape)
-                .clickable { onClick() },
+            modifier = Modifier.size(60.dp),
             contentAlignment = Alignment.Center
         ) {
-            ZonerAsyncImage(
-                imageUrl = status.media.firstOrNull()?.url,
-                contentDescription = "Profile picture",
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.align(Alignment.Center)
-            )
+            // Background border with segments
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                val strokeWidth = 2.dp.toPx()
+                val radius = size.minDimension / 2 - strokeWidth / 2
+
+                // Draw base circle (subtle background)
+                drawCircle(
+                    color = baseCircleColor,
+                    radius = radius,
+                    style = Stroke(strokeWidth)
+                )
+
+                // Draw status segments
+                if (state.statusCount > 1) {
+                    val segmentAngle = 360f / min(state.statusCount, 8)
+                    val sweepAngle = segmentAngle * 0.85f // Gap between segments
+
+                    repeat(min(state.statusCount, 8)) { index ->
+                        val startAngle = index * segmentAngle - 90f
+                        val segmentColor = if (index < state.viewedCount) viewedColor else unviewedColor
+
+                        drawArc(
+                            color = segmentColor,
+                            startAngle = startAngle,
+                            sweepAngle = sweepAngle,
+                            useCenter = false,
+                            topLeft = Offset(strokeWidth, strokeWidth),
+                            size = Size(size.width - strokeWidth * 2, size.height - strokeWidth * 2),
+                            style = Stroke(strokeWidth)
+                        )
+                    }
+                } else {
+                    // Single status - use appropriate color based on viewed state
+                    val borderColor = if (state.viewedCount > 0) viewedColor else unviewedColor
+                    drawCircle(
+                        color = borderColor,
+                        radius = radius,
+                        style = Stroke(strokeWidth)
+                    )
+                }
+            }
+
+            // Staus Image container
+            Box(
+                modifier = Modifier
+                    .size(52.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.surface)
+                    .clickable { onClick() },
+                contentAlignment = Alignment.Center
+            ) {
+                ZonerAsyncImage(
+                    imageUrl = state.latestStatus?.mediaUri,
+                    contentDescription = "Profile picture",
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+
+                // Badge showing total status count if > 1
+                if (state.statusCount > 1) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .offset(y = (-4).dp, x = (-4).dp)
+                            .size(18.dp)
+                            .clip(CircleShape)
+                            .background(
+                                if (state.viewedCount < state.statusCount)
+                                    unviewedColor
+                                else
+                                    viewedColor
+                            )
+                    ) {
+                        Text(
+                            text = if (state.statusCount > 9) "9+" else state.statusCount.toString(),
+                            color = if (state.viewedCount < state.statusCount)
+                                MaterialTheme.colorScheme.onPrimary
+                            else
+                                MaterialTheme.colorScheme.onBackground,
+                            style = MaterialTheme.typography.labelSmall,
+                            fontSize = 10.sp,
+                            modifier = Modifier.align(Alignment.Center)
+                        )
+                    }
+                }
+            }
         }
+
+        // Label
         Text(
-            text = status.author.name,
-            style = MaterialTheme.typography.titleSmall.copy(
-                fontSize = 11.sp, fontWeight = FontWeight.SemiBold
+            text = state.authorName,
+            style = MaterialTheme.typography.labelSmall.copy(
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 11.sp
             ),
             maxLines = 1,
-            overflow = TextOverflow.Ellipsis
+            overflow = TextOverflow.Ellipsis,
+            color = if (state.viewedCount < state.statusCount)
+                MaterialTheme.colorScheme.onSurface
+            else
+                MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
 }
@@ -745,5 +763,77 @@ private fun AddStatusItem(
                 .size(24.dp)
                 .align(Alignment.BottomEnd),
         )
+    }
+}
+
+
+@Composable
+fun PostsList(
+    posts: List<Post>,
+    onPostClick: (Post) -> Unit,
+    onMoreItemsClick: (Post) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val listState = rememberLazyListState()
+    var trackHeightPx by remember { mutableIntStateOf(0) }
+
+    val scrollProgress by remember {
+        derivedStateOf {
+            val firstVisibleItem = listState.firstVisibleItemIndex
+            val totalItems = listState.layoutInfo.totalItemsCount
+            if (totalItems > 1)
+                (firstVisibleItem.toFloat() / (totalItems - 1)).coerceIn(0f, 1f)
+            else 0f
+        }
+    }
+
+    // Animate the thumb position
+    val animatedProgress by animateFloatAsState(
+        targetValue = scrollProgress,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessLow
+        ),
+        label = "ScrollProgressAnimation"
+    )
+
+    Box(modifier = modifier.fillMaxSize()) {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            state = listState
+        ) {
+            items(posts, key = { item -> item.id }) { post ->
+                PostItem(
+                    post = post,
+                    onPostClick = { onPostClick(post) },
+                    onMoreItemsClick = { onMoreItemsClick(post) }
+                )
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+            }
+        }
+
+        // Custom scrollbar
+        Box(
+            modifier = Modifier
+                .fillMaxHeight()
+                .width(6.dp)
+                .align(Alignment.CenterEnd)
+                .padding(vertical = 12.dp)
+                .onGloballyPositioned { layoutCoordinates ->
+                    trackHeightPx = layoutCoordinates.size.height
+                }
+        ) {
+            // Scroll thumb
+            val thumbHeightPx = with(LocalDensity.current) { 40.dp.toPx() }
+            val offsetY = ((trackHeightPx - thumbHeightPx) * animatedProgress).toInt()
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(80.dp)
+                    .offset { IntOffset(x = 0, y = offsetY) }
+                    .background(Color.Gray, RoundedCornerShape(3.dp))
+            )
+        }
     }
 }

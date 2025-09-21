@@ -11,6 +11,7 @@ import com.zoner.domain.network.NetworkService
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import okhttp3.OkHttpClient
+import okhttp3.Protocol
 import okhttp3.logging.HttpLoggingInterceptor
 import org.koin.dsl.module
 import retrofit2.Retrofit
@@ -34,9 +35,10 @@ val networkModule = module {
         }
 
         OkHttpClient.Builder()
-            .connectTimeout(30, TimeUnit.SECONDS)
-            .readTimeout(30, TimeUnit.SECONDS)
-            .writeTimeout(30, TimeUnit.SECONDS)
+            .connectTimeout(60, TimeUnit.SECONDS)
+            .readTimeout(60, TimeUnit.SECONDS)
+            .writeTimeout(60, TimeUnit.SECONDS)
+            .protocols(listOf(Protocol.HTTP_1_1)) // disable HTTP/2
             .addInterceptor(loggingInterceptor)
             .addInterceptor(get<AuthInterceptor>()) // Inject AuthInterceptor
             .build()

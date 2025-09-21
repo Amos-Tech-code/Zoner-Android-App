@@ -70,29 +70,27 @@ class StatusSyncWorker(
                             successfullyProcessedIds.add(localStatus.localId) // Mark as done
                         }
                     } else {
-                        if (localStatus.serverId != null) {
-                            val response = networkService.uploadStatus(localStatus.toUploadStatusRequest())
-                            when (response) {
-                                is ResultWrapper.Failure -> {
-                                    userStatusDao.markSyncFailed(
-                                        localStatus.localId,
-                                        response.exception.message
-                                    )
-                                    hasFailures = true
-                                }
+                        val response = networkService.uploadStatus(localStatus.toUploadStatusRequest())
+                        when (response) {
+                            is ResultWrapper.Failure -> {
+                                userStatusDao.markSyncFailed(
+                                    localStatus.localId,
+                                    response.exception.message
+                                )
+                                hasFailures = true
+                            }
 
-                                is ResultWrapper.Success -> {
-                                    // Update local DB on success
-                                    userStatusDao.updateStatusAfterSync(
-                                        localStatus.localId,
-                                        serverId = response.value.id,
-                                        expiresAt = response.value.expiresAt,
-                                        lastUpdated = response.value.lastUpdated,
-                                        version = response.value.version,
-                                        isSynced = true,
-                                    )
-                                    successfullyProcessedIds.add(localStatus.localId) // Mark as done
-                                }
+                            is ResultWrapper.Success -> {
+                                // Update local DB on success
+                                userStatusDao.updateStatusAfterSync(
+                                    localStatus.localId,
+                                    serverId = response.value.id,
+                                    expiresAt = response.value.expiresAt,
+                                    lastUpdated = response.value.lastUpdated,
+                                    version = response.value.version,
+                                    isSynced = true,
+                                )
+                                successfullyProcessedIds.add(localStatus.localId) // Mark as done
                             }
                         }
                     }

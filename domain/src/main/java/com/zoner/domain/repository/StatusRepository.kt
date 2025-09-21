@@ -1,6 +1,7 @@
 package com.zoner.domain.repository
 
 import com.zoner.domain.model.MyStatus
+import com.zoner.domain.model.OtherStatusSummary
 import com.zoner.domain.model.SaveUserStatus
 import com.zoner.domain.model.StatusGroup
 import com.zoner.domain.model.UserStatusSummary
@@ -16,9 +17,13 @@ interface StatusRepository {
 
     suspend fun fetchUserStatusGroupFromLocal(): Flow<List<StatusGroup>>
 
+    suspend fun fetchUserStatusGroupFromServer()
+
     suspend fun getUserStatusSummary(): Flow<UserStatusSummary>
 
-    suspend fun fetchOtherUsersStatusFromServer(): Flow<List<StatusGroup>>
+    suspend fun getOtherUserStatusSummary(): Flow<List<OtherStatusSummary>>
+
+    suspend fun fetchOtherUsersStatusFromServer()
 
     suspend fun fetchOtherUsersStatusFromLocal(): Flow<List<StatusGroup>>
 

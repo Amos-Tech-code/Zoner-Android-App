@@ -14,17 +14,21 @@ import com.zoner.data.dto.auth.ResendOtpResponseDto
 import com.zoner.data.dto.auth.ResetPasswordDto
 import com.zoner.data.dto.auth.VerifyEmailRequestDto
 import com.zoner.data.dto.business.CreateBusinessProfileDto
+import com.zoner.data.dto.status.OtherUserStatusResponseDto
 import com.zoner.data.dto.status.StatusUploadResponseDto
+import com.zoner.data.dto.status.UserStatusResponseDto
 import okhttp3.MultipartBody
 import okhttp3.RequestBody
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.DELETE
+import retrofit2.http.GET
 import retrofit2.http.Multipart
 import retrofit2.http.POST
 import retrofit2.http.PUT
 import retrofit2.http.Part
 import retrofit2.http.Path
+import retrofit2.http.Query
 
 interface ApiService {
 
@@ -75,18 +79,25 @@ interface ApiService {
     @POST("business/create")
     suspend fun createBusinessProfile(@Body request: CreateBusinessProfileDto) : Response<LoginResponseDto>
 
-
     /**
      * Status Implementation
      */
     @Multipart
-    @POST("status/upload")
+    @POST("status")
     suspend fun uploadStatus(
         @Part("caption") caption: RequestBody?,
         @Part("mediaType") mediaType: RequestBody,
         @Part("durationMillis") durationMillis: RequestBody,
         @Part mediaFile: MultipartBody.Part
     ): Response<StatusUploadResponseDto>
+
+    @GET("status")
+    suspend fun fetchUserStatus() : Response<UserStatusResponseDto>
+    @GET("status/discover")
+    suspend fun fetchOtherUserStatuses(
+        @Query("page") page : Int?,
+        @Query("pageSize") pageSize: Int?,
+    ) : Response<OtherUserStatusResponseDto>
 
     @Multipart
     @PUT("status/{id}")
@@ -96,7 +107,7 @@ interface ApiService {
         @Part("mediaType") mediaType: RequestBody,
         @Part("durationMillis") durationMillis: RequestBody,
         @Part mediaFile: MultipartBody.Part? = null
-    ) : Response<GenericResponseDto>
+    ) : Response<StatusUploadResponseDto>
 
     @DELETE("/status/{id}")
     suspend fun deleteStatus(@Path("id") id: String) : Response<GenericResponseDto>
