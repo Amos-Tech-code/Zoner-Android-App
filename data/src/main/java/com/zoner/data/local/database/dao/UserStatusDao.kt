@@ -25,13 +25,14 @@ interface UserStatusDao {
     suspend fun getPendingStatuses(): List<UserStatusEntity>
 
     @Query("UPDATE user_status SET" +
-            " serverId=:serverId, state='UPLOADED'," +
+            " serverId=:serverId, state='UPLOADED', createdAt=:createdAt," +
             " lastUpdated=:lastUpdated, version=:version," +
             " isSynced=:isSynced, expiresAt=:expiresAt" +
             " WHERE localId=:localId")
     suspend fun updateStatusAfterSync(
         localId: Long,
         serverId: String,
+        createdAt: Long,
         expiresAt: Long,
         lastUpdated: Long?,
         version: Int,
@@ -59,17 +60,36 @@ interface UserStatusDao {
     @Query("DELETE FROM user_status WHERE localId = :id")
     suspend fun deleteStatus(id: Long)
 
+    @Query("UPDATE user_status SET " +
+            "deleted = 1, deletedAt = :currentTime, isSynced = 0  " +
+            "WHERE localId = :id"
+    )
+    suspend fun softDeleteStatus(id: Long, currentTime: Long)
+
     @Query("DELETE FROM user_status WHERE state = 'UPLOADED' AND expiresAt < :expiryTime")
     suspend fun deleteExpiredStatuses(expiryTime: Long)
 
-    @Query("SELECT COUNT(*) FROM user_status")
+    @Query("""
+        SELECT COUNT(*) FROM user_status 
+        WHERE deleted = 0 
+        AND (expiresAt IS NULL OR expiresAt > strftime('%s','now') * 1000)
+    """)
     fun getStatusCountFlow(): Flow<Int>
-    // Group by state
-    @Query("SELECT state, COUNT(*) as count FROM user_status GROUP BY state")
+
+    @Query("""
+        SELECT state, COUNT(*) as count FROM user_status 
+        WHERE deleted = 0 
+        AND (expiresAt IS NULL OR expiresAt > strftime('%s','now') * 1000) 
+        GROUP BY state
+    """)
     fun getStatusCountsByState(): Flow<List<StateCount>>
 
-    // Latest status (for preview in UI)
-    @Query("SELECT * FROM user_status ORDER BY createdAt DESC LIMIT 1")
+    @Query("""
+        SELECT * FROM user_status 
+        WHERE deleted = 0 
+        AND (expiresAt IS NULL OR expiresAt > strftime('%s','now') * 1000) 
+        ORDER BY createdAt DESC LIMIT 1
+    """)
     fun getLatestStatus(): Flow<UserStatusEntity?>
 
     @Query("SELECT COUNT(*) FROM user_status WHERE state = 'UPLOADED' AND expiresAt < :currentTime")
@@ -78,5 +98,7 @@ interface UserStatusDao {
     @Query("SELECT localId, localPath FROM user_status WHERE state = 'UPLOADED' AND expiresAt < :currentTime")
     suspend fun getExpiredStatusesWithPaths(currentTime: Long): List<StatusPath>
 
+    @Query("DELETE FROM user_status")
+    fun deleteAll()
 
 }

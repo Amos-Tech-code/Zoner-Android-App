@@ -296,13 +296,18 @@ class StatusRepositoryImpl (
         }
     }
 
+    @OptIn(ExperimentalTime::class)
     override suspend fun deleteStatus(id: String) {
         try {
             userStatusDao.getStatusById(id)?.let { status ->
                 status.localPath?.let { path ->
                     deleteFileIfSafe(path)
                 }
-                userStatusDao.deleteStatus(id.toLong())
+                if (status.serverId == null) {
+                    userStatusDao.deleteStatus(id.toLong())
+                } else {
+                    userStatusDao.softDeleteStatus(id.toLong(), Clock.System.now().toEpochMilliseconds())
+                }
             }
         } catch (e: Exception) {
             Log.e("StatusRepository", "Local Saved status delete failed", e)
@@ -404,6 +409,7 @@ class StatusRepositoryImpl (
         return MyStatus(
             id = serverId ?: localId.toString(),
             mediaUri = mediaUri.toUri(),
+            blurHash = blurHash,
             caption = caption,
             mediaType = enumValueOf(mediaType),
             createdAt = Instant.fromEpochMilliseconds(createdAt),
@@ -441,7 +447,7 @@ class StatusRepositoryImpl (
     private suspend fun OtherUserStatusEntity.toOtherUserStatus(): OtherUserStatus {
         return OtherUserStatus(
             id = id,
-            mediaUri = mediaUri.toUri(),
+            mediaUri = mediaUri,
             caption = caption,
             mediaType = enumValueOf(mediaType),
             createdAt = Instant.fromEpochMilliseconds(createdAt),
@@ -480,7 +486,7 @@ class StatusRepositoryImpl (
         return LocalUser(
             id = user?.id.orEmpty(),
             imgUrl = user?.imgUrl,
-            name = user?.name
+            name = "My Status"//user?.name
         )
     }
 

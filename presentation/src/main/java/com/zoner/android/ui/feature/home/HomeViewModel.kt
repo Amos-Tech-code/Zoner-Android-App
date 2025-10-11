@@ -36,7 +36,7 @@ class HomeViewModel(
    var loggedInUser: LocalUser? = null
 
    init {
-      //populateStatuses()
+      populateStatuses()
       observeUserFromLocal()
       loadStatuses()
    }
@@ -44,9 +44,9 @@ class HomeViewModel(
    private fun populateStatuses() {
        try {
            viewModelScope.launch {
-              val userStatuses = async{ repository.fetchUserStatusGroupFromServer() }
+              //val userStatuses = async{ repository.fetchUserStatusGroupFromServer() }
               val otherUserStatuses = async { repository.fetchOtherUsersStatusFromServer() }
-              userStatuses.await()
+              //userStatuses.await()
               otherUserStatuses.await()
            }
        } catch (e: Exception) {

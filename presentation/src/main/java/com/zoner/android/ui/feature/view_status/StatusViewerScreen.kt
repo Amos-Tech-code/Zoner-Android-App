@@ -34,6 +34,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -42,6 +43,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.zoner.android.ui.designSystem.LoadingComponent
@@ -53,6 +55,7 @@ import com.zoner.android.util.toRelativeTime
 import com.zoner.domain.model.BaseStatus
 import com.zoner.domain.model.MediaType
 import com.zoner.domain.model.StatusGroup
+import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
 import kotlin.time.ExperimentalTime
 
@@ -80,13 +83,15 @@ fun StatusViewerScreen(
             onPrevious = viewModel::moveToPreviousStatus,
             onClose = viewModel::closeViewer,
             onProgressChanged = viewModel::onProgressChanged,
-            modifier = Modifier.fillMaxSize().padding(innerPadding)
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
         )
     }
 }
 
 @Composable
-private fun StatusViewerContent(
+fun StatusViewerContent(
     state: StatusViewingState,
     onNext: () -> Unit,
     onPrevious: () -> Unit,
@@ -97,7 +102,9 @@ private fun StatusViewerContent(
     val currentStatus = state.statuses.getOrNull(state.currentIndex)
     var isPressed by remember { mutableStateOf(false) }
 
-    Box(modifier = modifier.fillMaxSize().background(Color.Black)) {
+    Box(modifier = modifier
+        .fillMaxSize()
+        .background(Color.Black)) {
         if (state.isLoading) {
             LoadingComponent(
                 type = LoadingType.Circular,
@@ -112,6 +119,15 @@ private fun StatusViewerContent(
                 onMediaEnded = onNext
             )
 
+            StatusNavigationHandler(
+                onNext = onNext,
+                onPrevious = onPrevious,
+                onPress = { isPressed = it },
+                modifier = Modifier
+                    .matchParentSize()
+                    .zIndex(0f) // <-- explicitly send to back
+            )
+
             state.statusGroup?.let {
                 StatusViewHeader(
                     statusGroup = it,
@@ -120,14 +136,9 @@ private fun StatusViewerContent(
                     onClose = onClose,
                     modifier = Modifier
                         .align(Alignment.TopCenter)
+                        .zIndex(1f)
                 )
             }
-
-            StatusNavigationHandler(
-                onNext = onNext,
-                onPrevious = onPrevious,
-                onPress = { isPressed = it }
-            )
         }
     }
 }
@@ -152,52 +163,14 @@ private fun StatusMediaContent(
         }
         MediaType.VIDEO -> {
             StatusVideoPlayer(
-                uri = status.mediaUri,
-                paused = isPaused,
+                videoUrl = status.mediaUri.toString(),
+                isPaused = isPaused,
                 onProgress = onProgressChanged,
                 onEnded = onMediaEnded,
                 modifier = modifier
             )
         }
     }
-}
-
-@Composable
-private fun StatusImageViewer(
-    status: BaseStatus,
-    isPaused: Boolean,
-    onProgressChanged: (Float) -> Unit,
-    onAnimationFinished: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val animatable = remember { Animatable(0f) }
-
-    LaunchedEffect(status, isPaused) {
-        animatable.stop()
-
-        if (!isPaused) {
-            val remainingTime = status.durationMillis * (1f - animatable.value)
-            animatable.animateTo(
-                1f,
-                animationSpec = tween(
-                    durationMillis = remainingTime.toInt(),
-                    easing = LinearEasing
-                )
-            ) {
-                onProgressChanged(value)
-                if (value >= 1f) {
-                    onAnimationFinished()
-                }
-            }
-        }
-    }
-
-    ZonerAsyncImage(
-        imageUrl = status.mediaUri,
-        contentDescription = null,
-        modifier = modifier.fillMaxSize(),
-        contentScale = ContentScale.Crop
-    )
 }
 
 @OptIn(ExperimentalTime::class)
@@ -212,7 +185,8 @@ private fun StatusViewHeader(
     val currentStatus = statusGroup.statuses.getOrNull(currentIndex)
 
     Column(
-        modifier = modifier.fillMaxWidth()
+        modifier = modifier
+            .fillMaxWidth()
             .background(Color.Black.copy(0.4f))
             .padding(horizontal = 8.dp)
             .height(70.dp)
@@ -248,7 +222,7 @@ private fun StatusViewHeader(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 ZonerAsyncImage(
-                    imageUrl = "https://picsum.photos/200/200",
+                    imageUrl = statusGroup.authorAvatar,
                     contentDescription = "User avatar",
                     modifier = Modifier
                         .size(36.dp)
@@ -306,7 +280,6 @@ private fun StatusNavigationHandler(
     )
 }
 
-
 @Composable
 private fun StatusProgressBars(
     total: Int,
@@ -343,3 +316,92 @@ private fun StatusProgressBars(
         }
     }
 }
+
+
+@Composable
+private fun StatusImageViewer(
+    status: BaseStatus,
+    isPaused: Boolean,
+    onProgressChanged: (Float) -> Unit,
+    onAnimationFinished: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var isImageLoading by remember { mutableStateOf(true) }
+    val animatable = remember { Animatable(0f) }
+    val scope = rememberCoroutineScope()
+
+    LaunchedEffect(status, isPaused, isImageLoading) {
+        // Don't start animation if image is still loading or paused
+        if (isImageLoading || isPaused) {
+            animatable.stop()
+            return@LaunchedEffect
+        }
+
+        // Start animation only when image is loaded and not paused
+        val remainingTime = status.durationMillis * (1f - animatable.value)
+        animatable.animateTo(
+            1f,
+            animationSpec = tween(
+                durationMillis = remainingTime.toInt(),
+                easing = LinearEasing
+            )
+        ) {
+            onProgressChanged(value)
+            if (value >= 1f) {
+                onAnimationFinished()
+            }
+        }
+    }
+
+    ZonerAsyncImage(
+        imageUrl = status.mediaUri,
+        contentDescription = null,
+        modifier = modifier.fillMaxSize(),
+        contentScale = ContentScale.Crop,
+        onLoadingStateChange = { loading ->
+            isImageLoading = loading
+            // Reset progress when loading starts
+            if (loading) {
+                scope.launch{ animatable.snapTo(0f) }
+                onProgressChanged(0f)
+            }
+        }
+    )
+}
+//@Composable
+//private fun StatusImageViewer(
+//    status: BaseStatus,
+//    isPaused: Boolean,
+//    onProgressChanged: (Float) -> Unit,
+//    onAnimationFinished: () -> Unit,
+//    modifier: Modifier = Modifier
+//) {
+//    val animatable = remember { Animatable(0f) }
+//
+//    LaunchedEffect(status, isPaused) {
+//        animatable.stop()
+//
+//        if (!isPaused) {
+//            val remainingTime = status.durationMillis * (1f - animatable.value)
+//            animatable.animateTo(
+//                1f,
+//                animationSpec = tween(
+//                    durationMillis = remainingTime.toInt(),
+//                    easing = LinearEasing
+//                )
+//            ) {
+//                onProgressChanged(value)
+//                if (value >= 1f) {
+//                    onAnimationFinished()
+//                }
+//            }
+//        }
+//    }
+//
+//    ZonerAsyncImage(
+//        imageUrl = status.mediaUri,
+//        contentDescription = null,
+//        modifier = modifier.fillMaxSize(),
+//        contentScale = ContentScale.Crop
+//    )
+//}

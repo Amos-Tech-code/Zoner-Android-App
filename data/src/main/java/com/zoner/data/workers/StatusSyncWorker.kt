@@ -85,6 +85,7 @@ class StatusSyncWorker(
                                 userStatusDao.updateStatusAfterSync(
                                     localStatus.localId,
                                     serverId = response.value.id,
+                                    createdAt = response.value.createdAt,
                                     expiresAt = response.value.expiresAt,
                                     lastUpdated = response.value.lastUpdated,
                                     version = response.value.version,

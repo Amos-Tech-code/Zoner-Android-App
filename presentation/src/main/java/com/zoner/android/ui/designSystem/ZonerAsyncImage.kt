@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -39,11 +40,16 @@ fun ZonerAsyncImage(
     // Shimmer color
     shimmerColor: Color = MaterialTheme.colorScheme.surfaceVariant,
     // Image content scale
-    contentScale: ContentScale = ContentScale.Crop
+    contentScale: ContentScale = ContentScale.Crop,
+    onLoadingStateChange: (Boolean) -> Unit = {}
 ) {
     val context = LocalContext.current
     var isLoading by remember { mutableStateOf(true) }
     var isError by remember { mutableStateOf(false) }
+
+    LaunchedEffect(isLoading) {
+        onLoadingStateChange(isLoading)
+    }
 
     Box(modifier = modifier.fillMaxSize()) {
         AsyncImage(
@@ -58,9 +64,11 @@ fun ZonerAsyncImage(
             onError = {
                 isLoading = false
                 isError = true
+                onLoadingStateChange(false)
             },
             onSuccess = { isLoading = false
                 isError = false
+                onLoadingStateChange(false)
             },
             modifier = Modifier
                 .fillMaxSize()

@@ -1,17 +1,13 @@
 package com.zoner.data.di
 
-import android.content.Context
 import com.zoner.data.network.ConnectivityObserverImpl
 import com.zoner.data.remote.ApiService
 import com.zoner.data.remote.AuthInterceptor
 import com.zoner.data.remote.NetworkServiceImpl
-import com.zoner.data.workers.StatusCleanupWorker
+import com.zoner.data.remote.TimeoutInterceptor
 import com.zoner.domain.network.ConnectivityObserver
 import com.zoner.domain.network.NetworkService
-import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.Dispatchers
 import okhttp3.OkHttpClient
-import okhttp3.Protocol
 import okhttp3.logging.HttpLoggingInterceptor
 import org.koin.dsl.module
 import retrofit2.Retrofit
@@ -22,10 +18,9 @@ const val BASE_URL = "https://zoner-server.onrender.com/"
 
 val networkModule = module {
 
-
     // Single instance of OkHttpClient
     single {
-        val isDebug: Boolean = getProperty("isDebug") ?: false
+        val isDebug: Boolean = getProperty("isDebug")
         val loggingInterceptor = HttpLoggingInterceptor().apply {
             level = if (isDebug) {
                 HttpLoggingInterceptor.Level.BODY
@@ -38,14 +33,17 @@ val networkModule = module {
             .connectTimeout(60, TimeUnit.SECONDS)
             .readTimeout(60, TimeUnit.SECONDS)
             .writeTimeout(60, TimeUnit.SECONDS)
-            .protocols(listOf(Protocol.HTTP_1_1)) // disable HTTP/2
             .addInterceptor(loggingInterceptor)
-            .addInterceptor(get<AuthInterceptor>()) // Inject AuthInterceptor
+            .addInterceptor(get<TimeoutInterceptor>()) // Timeout Interceptor
+            .addInterceptor(get<AuthInterceptor>()) // Auth Interceptor
             .build()
     }
 
     // Auth Interceptor
     single{ AuthInterceptor(get()) }
+
+    // Timeout Interceptor
+    single { TimeoutInterceptor() }
 
     // Single instance of ApiService
     single<ApiService> {
@@ -61,6 +59,7 @@ val networkModule = module {
     single<NetworkService> {
         NetworkServiceImpl(get(), get(), get())
     }
+
     // Single instance of Connectivity Observer
     single<ConnectivityObserver> { ConnectivityObserverImpl(get()) }
 

@@ -115,7 +115,7 @@ class NetworkServiceImpl(
         }
     }
 
-    val emptyResponseMessage = "Empty response from server. Please try again."
+    val emptyResponseMessage = "Empty response from server. Please try again later."
 
     override suspend fun login(loginRequest: LoginRequest): ResultWrapper<LoginResponse> {
         return safeApiCall {
@@ -318,7 +318,6 @@ class NetworkServiceImpl(
             }
         }
     }
-
 
     override suspend fun getUserStatuses():  ResultWrapper<List<StatusResponse>> {
         return safeApiCall {

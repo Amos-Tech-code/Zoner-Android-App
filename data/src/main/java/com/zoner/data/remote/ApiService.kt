@@ -82,6 +82,7 @@ interface ApiService {
     /**
      * Status Implementation
      */
+    @DynamicTimeout(connect = 300, read = 300, write = 300)
     @Multipart
     @POST("status")
     suspend fun uploadStatus(
@@ -93,6 +94,7 @@ interface ApiService {
 
     @GET("status")
     suspend fun fetchUserStatus() : Response<UserStatusResponseDto>
+
     @GET("status/discover")
     suspend fun fetchOtherUserStatuses(
         @Query("page") page : Int?,
@@ -113,3 +115,19 @@ interface ApiService {
     suspend fun deleteStatus(@Path("id") id: String) : Response<GenericResponseDto>
 
 }
+
+/**
+ * Dynamic TimeOut Annotation for Retrofit calls
+ * Use it like this:
+ * @param connect Timeout for connection
+ * @param read Timeout for reading
+ * @param write Timeout for writing
+ * @see TimeoutInterceptor
+ */
+@Retention(AnnotationRetention.RUNTIME)
+@Target(AnnotationTarget.FUNCTION)
+annotation class DynamicTimeout(
+    val connect: Int = 60,
+    val read: Int = 60,
+    val write: Int = 60
+)

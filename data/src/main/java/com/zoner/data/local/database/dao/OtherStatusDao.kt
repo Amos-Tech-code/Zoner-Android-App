@@ -39,4 +39,8 @@ interface OtherStatusDao {
 
     @Query("DELETE FROM other_user_status WHERE expiresAt < :currentTime")
     suspend fun deleteExpired(currentTime: Long)
+
+    @Query("DELETE FROM other_user_status")
+    fun deleteAll()
+
 }

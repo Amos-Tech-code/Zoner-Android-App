@@ -16,4 +16,8 @@ interface StatusInteractionDao {
 
     @Query("UPDATE status_interactions SET isSynced = 1 WHERE statusId = :id")
     suspend fun markAsSynced(id: Long)
+
+    @Query("DELETE FROM status_interactions")
+    fun deleteAll()
+
 }

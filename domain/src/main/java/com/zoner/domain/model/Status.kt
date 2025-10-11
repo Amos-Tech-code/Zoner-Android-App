@@ -23,7 +23,9 @@ data class StatusGroup(
 @OptIn(ExperimentalTime::class)
 sealed class BaseStatus {
     abstract val id: String
-    abstract val mediaUri: Uri
+    abstract val mediaUri: Any
+
+    abstract val blurHash: String?
     abstract val caption: String?
     abstract val mediaType: MediaType
     abstract val createdAt: Instant
@@ -46,6 +48,7 @@ sealed class BaseStatus {
 data class MyStatus(
     override val id: String,
     override val mediaUri: Uri,
+    override val blurHash: String?,
     override val caption: String?,
     override val mediaType: MediaType,
     override val createdAt: Instant,
@@ -55,20 +58,20 @@ data class MyStatus(
     override val expiresAt: Instant,
     override val likes: List<StatusInteraction>,
     override val views: List<StatusInteraction>,
-    override val replies: List<StatusInteraction>
+    override val replies: List<StatusInteraction>,
 ) : BaseStatus()
 
 // Other users' statuses
 @OptIn(ExperimentalTime::class)
 data class OtherUserStatus(
     override val id: String,
-    override val mediaUri: Uri,
+    override val mediaUri: String,
+    override val blurHash: String?,
     override val caption: String?,
     override val mediaType: MediaType,
     override val createdAt: Instant,
     val isViewed: Boolean,
     val isDownloaded: Boolean,
-    val blurHash: String?,
     override val durationMillis: Long,
     override val localFilePath: String?,
     override val expiresAt: Instant,

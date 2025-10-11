@@ -1,5 +1,6 @@
 package com.zoner.android.ui.feature.home
 
+import android.net.Uri
 import android.widget.Toast
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
@@ -98,6 +99,7 @@ import com.zoner.android.ui.theme.ZonerInfo
 import com.zoner.android.util.ObserveAsEvents
 import com.zoner.domain.model.LocalUser
 import com.zoner.domain.model.MediaType
+import com.zoner.domain.model.OtherUserStatus
 import org.koin.androidx.compose.koinViewModel
 import kotlin.math.min
 
@@ -252,7 +254,7 @@ private fun HomeScreenTopBar(
                         onAddStatusClick = onAddStatusClick,
                         onStatusClicked = onStatusClicked,
                         onMyStatusClick = onMyStatusClick,
-                        modifier = Modifier.fillMaxSize(),
+                        modifier = Modifier.fillMaxWidth(),
                     )
                 }
             }
@@ -335,9 +337,10 @@ private fun StatusItems(
 ) {
     LazyRow(
         modifier,
-        horizontalArrangement = Arrangement.spacedBy(4.dp)
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        contentPadding = PaddingValues(top = 4.dp)
     ) {
-        if (isBusinessAccount) {
+        if (isBusinessAccount && myStatusUiState.latestStatus == null) {
             item {
                 AddStatusItem(
                     onClick = onAddStatusClick
@@ -541,7 +544,7 @@ private fun UserStatusItem(
                             }
                             MediaType.VIDEO -> {
                                 VideoThumbnail(
-                                    uri = state.latestStatus.mediaUri,
+                                    uri = state.latestStatus.mediaUri as Uri,
                                     localPath = state.latestStatus.localFilePath,
                                     showPlayButton = false,
                                     onVideoPlayClicked = onClick,
@@ -676,7 +679,7 @@ private fun StatusItem(
                 contentAlignment = Alignment.Center
             ) {
                 ZonerAsyncImage(
-                    imageUrl = state.latestStatus?.mediaUri,
+                    imageUrl = state.latestStatus?.blurHash,
                     contentDescription = "Profile picture",
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize()

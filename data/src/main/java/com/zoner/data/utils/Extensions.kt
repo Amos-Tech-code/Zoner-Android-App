@@ -23,7 +23,6 @@ sealed class FileConversionResult {
 /**
  * Converts a content:// Uri into a MultipartBody.Part for uploading
  */
-
 fun Uri.toMultipartBodyPart(
     context: Context,
     partName: String = "file"
