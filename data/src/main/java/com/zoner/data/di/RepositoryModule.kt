@@ -14,11 +14,11 @@ import org.koin.dsl.module
 
 val repositoryModule = module {
 
-    single<UserRepository> { UserRepositoryImpl(get(), get()) }
+    single<UserRepository> { UserRepositoryImpl(get(), get(), get()) }
 
     single<CountryRepository> { CountryRepositoryImpl(get()) }
 
-    single<StatusRepository> { StatusRepositoryImpl(get(), get(), get(), get()) }
+    single<StatusRepository> { StatusRepositoryImpl(get(), get(), get(), get(), get()) }
 
     single<AccountRepository> { AccountRepositoryImpl(get()) }
 

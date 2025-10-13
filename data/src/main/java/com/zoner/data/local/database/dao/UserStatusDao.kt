@@ -15,10 +15,13 @@ interface UserStatusDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertStatus(status: UserStatusEntity)
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertStatuses(statuses: List<UserStatusEntity>)
 
-    @Query("SELECT * FROM user_status ORDER BY createdAt ASC")
+    @Query("SELECT serverId FROM user_status WHERE serverId IN (:serverIds)")
+    suspend fun getExistingServerIds(serverIds: List<String>): List<String>
+
+    @Query("SELECT * FROM user_status WHERE deleted = 0 AND (expiresAt IS NULL OR expiresAt > strftime('%s','now') * 1000) ORDER BY createdAt ASC")
     fun getUserStatuses(): Flow<List<UserStatusEntity>>
 
     @Query("SELECT * FROM user_status WHERE isSynced = 0 OR deleted = 1")
@@ -51,23 +54,8 @@ interface UserStatusDao {
     @Query("SELECT * FROM user_status WHERE localId = :id")
     suspend fun getStatusById(id: String): UserStatusEntity?
 
-    @Query("SELECT COUNT(*) FROM user_status")
-    fun getStatusCount(): Int
-
     @Update
     suspend fun updateStatus(status: UserStatusEntity)
-
-    @Query("DELETE FROM user_status WHERE localId = :id")
-    suspend fun deleteStatus(id: Long)
-
-    @Query("UPDATE user_status SET " +
-            "deleted = 1, deletedAt = :currentTime, isSynced = 0  " +
-            "WHERE localId = :id"
-    )
-    suspend fun softDeleteStatus(id: Long, currentTime: Long)
-
-    @Query("DELETE FROM user_status WHERE state = 'UPLOADED' AND expiresAt < :expiryTime")
-    suspend fun deleteExpiredStatuses(expiryTime: Long)
 
     @Query("""
         SELECT COUNT(*) FROM user_status 
@@ -97,6 +85,21 @@ interface UserStatusDao {
 
     @Query("SELECT localId, localPath FROM user_status WHERE state = 'UPLOADED' AND expiresAt < :currentTime")
     suspend fun getExpiredStatusesWithPaths(currentTime: Long): List<StatusPath>
+
+    @Query("DELETE FROM user_status WHERE localId = :id")
+    suspend fun deleteStatus(id: Long)
+
+    @Query("UPDATE user_status SET " +
+            "deleted = 1, deletedAt = :currentTime, isSynced = 0  " +
+            "WHERE localId = :id"
+    )
+    suspend fun softDeleteStatus(id: Long, currentTime: Long)
+
+    @Query("DELETE FROM user_status WHERE state = 'UPLOADED' AND expiresAt < :currentTime")
+    suspend fun deleteExpiredStatuses(currentTime: Long)
+
+    @Query("SELECT localPath FROM user_status WHERE localPath IS NOT NULL")
+    suspend fun getAllLocalPaths(): List<String?>
 
     @Query("DELETE FROM user_status")
     fun deleteAll()

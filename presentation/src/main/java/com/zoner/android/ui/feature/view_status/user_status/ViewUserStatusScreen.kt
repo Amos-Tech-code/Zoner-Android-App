@@ -358,7 +358,7 @@ private fun MyStatusListItem(
 
         // Expanded engagement details (only show for uploaded statuses)
         AnimatedVisibility(
-            visible = isExpanded && status.state is StatusState.Uploaded,
+            visible = isExpanded, //&& status.state is StatusState.Uploaded,
             enter = expandVertically(
                 animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing)
             ) + fadeIn(
@@ -465,7 +465,7 @@ private fun StatusHeader(
         }
 
         // Expand/collapse button (only show for uploaded statuses)
-        if (status.state is StatusState.Uploaded) {
+        //if (status.state is StatusState.Uploaded) {
             IconButton(
                 onClick = onToggleExpand,
                 modifier = Modifier.size(24.dp).rotate(rotationState)
@@ -475,7 +475,7 @@ private fun StatusHeader(
                     contentDescription = if (isExpanded) "Collapse" else "Expand"
                 )
             }
-        }
+        //}
     }
 }
 

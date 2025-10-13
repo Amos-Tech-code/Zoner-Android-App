@@ -8,6 +8,7 @@ import com.zoner.data.local.database.ZonerDatabase
 import com.zoner.data.local.datastore.ZonerSession
 import com.zoner.data.local.datastore.dataStoreImpl
 import com.zoner.data.local.source.CountryLocalDataSource
+import com.zoner.data.utils.ZonerFileManager
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.asExecutor
@@ -55,6 +56,8 @@ val localModule = module {
     single { ZonerSession(get()) }
     // Country local data source
     single { CountryLocalDataSource(get()) }
+    // File manager util
+    single { ZonerFileManager(get()) }
 
     // DAOs
     single { get<ZonerDatabase>().userStatusDao() }

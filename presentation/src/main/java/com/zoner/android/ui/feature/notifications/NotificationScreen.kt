@@ -92,7 +92,7 @@ private fun NotificationTopBar(
     TopAppBar(
         title = {
             Text(
-                text = "NOTIFICATIONS",
+                text = "Notifications",
                 style = MaterialTheme.typography.titleLarge,
             )
         },

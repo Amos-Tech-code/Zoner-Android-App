@@ -38,18 +38,18 @@ class StatusCleanupWorker(
             val expiredCount = repository.getExpiredStatusCount()
 
             if (expiredCount == 0) {
-                Log.d(TAG, "No expired statuses found - skipping cleanup")
+                //Log.d(TAG, "No expired statuses found - skipping cleanup")
                 return Result.success() // Success with no work needed
             }
 
-            Log.d(TAG, "Found $expiredCount expired statuses - proceeding with cleanup")
+            //Log.d(TAG, "Found $expiredCount expired statuses - proceeding with cleanup")
 
-            val deletedCount = repository.cleanExpiredStatuses()
+            repository.cleanExpiredStatuses()
 
-            Log.d(TAG, "Successfully cleaned up $deletedCount expired statuses")
+            //Log.d(TAG, "Successfully cleaned up $deletedCount expired statuses")
             Result.success()
         } catch (e: Exception) {
-            Log.e(TAG, "Cleanup failed", e)
+            //Log.e(TAG, "Cleanup failed", e)
             Result.retry()
         }
     }

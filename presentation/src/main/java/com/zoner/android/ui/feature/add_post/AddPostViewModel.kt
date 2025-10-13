@@ -4,11 +4,13 @@ import android.content.Context
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.zoner.android.util.MAX_FILE_SIZE
 import com.zoner.android.util.MAX_POST_MEDIA
 import com.zoner.android.util.MAX_STATUS_MEDIA
 import com.zoner.android.util.isImage
 import com.zoner.android.util.isVideo
 import com.zoner.data.local.datastore.ZonerSession
+import com.zoner.data.utils.MediaUtils
 import com.zoner.domain.StatusState
 import com.zoner.domain.model.Audience
 import com.zoner.domain.model.LocalUser
@@ -16,6 +18,7 @@ import com.zoner.domain.model.MediaType
 import com.zoner.domain.model.PostType
 import com.zoner.domain.model.SaveUserStatus
 import com.zoner.domain.repository.StatusRepository
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -23,6 +26,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.File
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 
@@ -159,11 +164,35 @@ class AddPostViewModel(
         }
     }
 
+    // Add new post media items
     fun updatePostUris(newUris: List<Uri>, maxLimit: Int = MAX_POST_MEDIA) {
-        _postFormState.update {
-            val combined = (it.uris + newUris).distinctBy { uri -> uri.toString() }
-            val limited = combined.take(maxLimit)
-            it.copy(uris = limited)
+        viewModelScope.launch {
+            val validUris = mutableListOf<Uri>()
+
+            newUris.forEach { uri ->
+                val validationMsg = validateMedia(uri)
+                if (validationMsg == null) {
+                    validUris.add(uri)
+                } else {
+                    _event.send(AddPostEvent.ShowErrorMessage(validationMsg))
+                }
+            }
+
+            if (validUris.isNotEmpty()) {
+                _postFormState.update {
+                    val combined = (it.uris + validUris).distinctBy { uri -> uri.toString() }
+                    val limited = combined.take(maxLimit)
+
+                    // Notify if some URIs were skipped due to limit
+                    if (combined.size > maxLimit) {
+                        viewModelScope.launch {
+                            _event.send(AddPostEvent.ShowErrorMessage("Only $maxLimit items allowed for posts"))
+                        }
+                    }
+
+                    it.copy(uris = limited)
+                }
+            }
         }
     }
 
@@ -184,10 +213,35 @@ class AddPostViewModel(
      */
     // Add a new status entry
     fun addStatusItems(items: List<Status>, maxLimit: Int = MAX_STATUS_MEDIA) {
-        _statusFormState.update {
-            val combined = (it.data + items)
-            val limited = combined.take(maxLimit)
-            it.copy(data = limited)
+        viewModelScope.launch {
+            val validItems = mutableListOf<Status>()
+
+            items.forEach { status ->
+                status.media?.let { uri ->
+                    val validationMsg = validateMedia(uri)
+                    if (validationMsg == null) {
+                        validItems.add(status)
+                    } else {
+                        _event.send(AddPostEvent.ShowErrorMessage(validationMsg))
+                    }
+                }
+            }
+
+            if (validItems.isNotEmpty()) {
+                _statusFormState.update {
+                    val combined = (it.data + validItems)
+                    val limited = combined.take(maxLimit)
+
+                    // Notify if some items were skipped due to limit
+                    if (combined.size > maxLimit) {
+                        viewModelScope.launch {
+                            _event.send(AddPostEvent.ShowErrorMessage("Maximum $maxLimit status items allowed"))
+                        }
+                    }
+
+                    it.copy(data = limited)
+                }
+            }
         }
     }
 
@@ -290,26 +344,43 @@ class AddPostViewModel(
         _state.value = AddPostState.Nothing
     }
 
-    data class PostDataForm(
-        val uris: List<Uri> = emptyList(),
-        val description: String = "",
-        val category: String = "",
-        val price: String = "",
-        val location: String = "Wangige, Kabete",
-        val tags: List<String> = emptyList(),
-        val allowReposting : Boolean = true,
-        val audience: Audience = Audience.PUBLIC,
-        val commentsDisabled: Boolean = false,
-        val saveToArchive: Boolean = true,
-        val isLoading: Boolean = false
-    )
 
-    data class StatusDataForm(
-        val data: List<Status> = emptyList(),
-        val isLoading: Boolean = false
-    )
-    data class Status(
-        val media: Uri? = null,
-        val caption: String = ""
-    )
+    /**
+     * Enhanced media validation before adding files
+     */
+    private suspend fun validateMedia(uri: Uri): String? {
+        return try {
+            // Check file size
+            val fileSize = getFileSize(uri)
+            if (fileSize > MAX_FILE_SIZE) {
+                return "File too large: ${fileSize / (1024 * 1024)}MB. Maximum is ${MAX_FILE_SIZE / (1024 * 1024)}MB"
+            }
+
+//            // Check video duration if it's a video
+//            if (uri.isVideo(context)) {
+//                val duration = MediaUtils.getVideoDuration(context, uri)
+//                if (duration > MAX_VIDEO_DURATION) {
+//                    return "Video too long: ${duration / 1000}s. Maximum is ${MAX_VIDEO_DURATION / 1000}s"
+//                }
+//            }
+
+            null
+        } catch (e: Exception) {
+            return "Unable to validate file"
+        }
+    }
+
+    private suspend fun getFileSize(uri: Uri): Long = withContext(Dispatchers.IO) {
+        return@withContext when (uri.scheme) {
+            "content" -> {
+                context.contentResolver.openFileDescriptor(uri, "r")?.use { parcelFd ->
+                    parcelFd.statSize
+                } ?: 0L
+            }
+            "file" -> {
+                File(uri.path ?: "").length()
+            }
+            else -> 0L
+        }
+    }
 }

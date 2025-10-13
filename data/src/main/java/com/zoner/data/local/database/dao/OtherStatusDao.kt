@@ -4,15 +4,16 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import com.zoner.data.local.database.StatusPath
 import com.zoner.data.local.database.entities.OtherUserStatusEntity
 import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface OtherStatusDao {
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insert(status: OtherUserStatusEntity)
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertAll(statuses: List<OtherUserStatusEntity>)
 
     @Query("""
@@ -37,8 +38,17 @@ interface OtherStatusDao {
     @Query("UPDATE other_user_status SET isViewed = 1 WHERE id = :id")
     suspend fun markAsViewed(id: String)
 
+    @Query("SELECT COUNT(*) FROM other_user_status WHERE expiresAt < :currentTime")
+    suspend fun getExpiredStatusCount(currentTime: Long): Int
+
+    @Query("SELECT localPath FROM other_user_status WHERE expiresAt <= :currentTime AND localPath IS NOT NULL")
+    suspend fun getExpiredStatusesLocalPaths(currentTime: Long): List<String>
+
     @Query("DELETE FROM other_user_status WHERE expiresAt < :currentTime")
-    suspend fun deleteExpired(currentTime: Long)
+    suspend fun deleteExpiredStatuses(currentTime: Long)
+
+    @Query("SELECT localPath FROM other_user_status WHERE localPath IS NOT NULL")
+    suspend fun getAllLocalPaths(): List<String?>
 
     @Query("DELETE FROM other_user_status")
     fun deleteAll()

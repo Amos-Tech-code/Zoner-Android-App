@@ -33,10 +33,7 @@ interface StatusRepository {
 
     suspend fun deleteStatus(id: String)
 
-    suspend fun cleanExpiredStatuses() : Int
-
-    // Testing
-    suspend fun getStatusCount() : Int
+    suspend fun cleanExpiredStatuses()
 
     suspend fun getExpiredStatusCount() : Int
 

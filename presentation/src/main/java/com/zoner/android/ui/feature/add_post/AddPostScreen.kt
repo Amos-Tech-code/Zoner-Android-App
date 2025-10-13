@@ -150,7 +150,7 @@ fun AddPostScreen(
             when (postType) {
                 PostType.POST -> viewModel.updatePostUris(listOf(uri), MAX_POST_MEDIA)
                 PostType.STATUS -> viewModel.addStatusItems(
-                    listOf(AddPostViewModel.Status(media = uri, caption = "")),
+                    listOf(Status(media = uri, caption = "")),
                     MAX_STATUS_MEDIA
                 )
             }
@@ -170,7 +170,7 @@ fun AddPostScreen(
 
                 PostType.STATUS -> {
                     viewModel.addStatusItems(
-                        listOf(AddPostViewModel.Status(media = it, caption = "")),
+                        listOf(Status(media = it, caption = "")),
                         maxLimit = MAX_STATUS_MEDIA
                     )
                 }
@@ -188,7 +188,7 @@ fun AddPostScreen(
                 }
 
                 PostType.STATUS -> {
-                    val items = uris.map { uri -> AddPostViewModel.Status(media = uri, caption = "") }
+                    val items = uris.map { uri -> Status(media = uri, caption = "") }
                     viewModel.addStatusItems(items, maxLimit = MAX_STATUS_MEDIA)
                 }
             }
@@ -382,7 +382,7 @@ fun AddPostScreen(
 @Composable
 private fun CreatePostScreen(
     selectedMedia: List<Uri?>,
-    statusItems: List<AddPostViewModel.Status>,
+    statusItems: List<Status>,
     audience: Audience,
     allowReposting: Boolean,
     commentsDisabled: Boolean,
@@ -634,7 +634,7 @@ private fun PostTypeSelector(
 @Composable
 private fun MediaPreviewSection(
     postMediaItems: List<Uri?>,
-    statusItems: List<AddPostViewModel.Status>,
+    statusItems: List<Status>,
     postType: PostType,
     onRemovePostItem: (Int) -> Unit,
     onCaptionChange: (Int, String) -> Unit,

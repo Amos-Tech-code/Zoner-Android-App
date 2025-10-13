@@ -238,7 +238,9 @@ private fun HomeScreenTopBar(
 ) {
     TopAppBar(
         modifier = modifier.fillMaxWidth(),
-        expandedHeight = TopAppBarDefaults.LargeAppBarExpandedHeight,
+        expandedHeight = if (!isBusinessAccount && otherStatus.isEmpty()) {
+            TopAppBarDefaults.TopAppBarExpandedHeight
+        } else TopAppBarDefaults.LargeAppBarExpandedHeight,
         title = {
             Column(modifier = Modifier.fillMaxWidth()) {
                 HomeScreenHeader(onAddPostClick, user, modifier = Modifier.fillMaxWidth())

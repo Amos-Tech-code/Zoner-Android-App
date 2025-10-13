@@ -67,7 +67,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun StatusMediaCarousel(
     modifier: Modifier = Modifier,
-    items: List<AddPostViewModel.Status>,
+    items: List<Status>,
     onCaptionChange: (index: Int, caption: String) -> Unit,
     onRemoveItem: (index: Int) -> Unit,
     onMoveItem: (from: Int, to: Int) -> Unit,
@@ -88,7 +88,8 @@ fun StatusMediaCarousel(
         itemsIndexed(
             items,
             key = { index, status -> "${status.media.toString()}-$index" }
-        ) { index, status ->
+        )
+        { index, status ->
             var isDragging by remember { mutableStateOf(false) }
             var dragOffset by remember { mutableStateOf(0f) }
             val size by animateDpAsState(

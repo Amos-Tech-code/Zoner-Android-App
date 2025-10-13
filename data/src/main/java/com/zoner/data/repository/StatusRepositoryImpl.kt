@@ -16,6 +16,7 @@ import com.zoner.data.local.database.entities.UserStatusEntity
 import com.zoner.data.local.database.toEntity
 import com.zoner.data.local.datastore.ZonerSession
 import com.zoner.data.utils.MediaUtils
+import com.zoner.data.utils.ZonerFileManager
 import com.zoner.data.workers.StatusCleanupWorker
 import com.zoner.data.workers.StatusSyncWorker
 import com.zoner.domain.ResultWrapper
@@ -54,6 +55,7 @@ class StatusRepositoryImpl (
     private val context: Context,
     private val session: ZonerSession,
     private val database: ZonerDatabase,
+    private val fileManager: ZonerFileManager,
     private val networkService: NetworkService,
     private val dispatchers: CoroutineDispatcher = Dispatchers.IO
 ) : StatusRepository {
@@ -61,7 +63,6 @@ class StatusRepositoryImpl (
     private val userStatusDao: UserStatusDao by lazy { database.userStatusDao() }
     private val otherStatusDao: OtherStatusDao by lazy { database.otherUsersStatusDao() }
     private val interactionDao: StatusInteractionDao by lazy { database.statusInteractionsDao() }
-    private val appFilesDir = context.filesDir.canonicalPath
 
     @OptIn(ExperimentalTime::class)
     override suspend fun saveStatus(status: SaveUserStatus) {
@@ -149,17 +150,47 @@ class StatusRepositoryImpl (
             when (val response = networkService.getUserStatuses()) {
                 is ResultWrapper.Success -> {
                     val entities = response.value.map { it.toEntity() }
-                    userStatusDao.insertStatuses(entities)
+                    //userStatusDao.insertStatuses(entities)
+                    upsertUserStatuses(entities)
                 }
                 is ResultWrapper.Failure -> {
-                    Log.e("StatusRepository", "Server error: ${response.exception}")
+                    //Log.e("StatusRepository", "Server error: ${response.exception}")
                 }
             }
         } catch (e: Exception) {
-            Log.e("StatusRepository", "Failed to fetch user status", e)
+            //Log.e("StatusRepository", "Failed to fetch user status", e)
         }
     }
 
+    private suspend fun upsertUserStatuses(serverStatuses: List<UserStatusEntity>) {
+        // Get existing server IDs to avoid conflicts
+        val existingServerIds = userStatusDao.getExistingServerIds(
+            serverStatuses.mapNotNull { it.serverId }
+        )
+
+        val statusesToInsert = mutableListOf<UserStatusEntity>()
+        //val statusesToUpdate = mutableListOf<UserStatusEntity>()
+
+        serverStatuses.forEach { serverStatus ->
+            if (serverStatus.serverId != null && serverStatus.serverId in existingServerIds) {
+                // Update existing status
+                //statusesToUpdate.add(serverStatus)
+            } else {
+                // Insert new status
+                statusesToInsert.add(serverStatus)
+            }
+        }
+
+        // Batch insert new statuses
+        if (statusesToInsert.isNotEmpty()) {
+            userStatusDao.insertStatuses(statusesToInsert)
+        }
+
+        // Batch update existing statuses
+//        if (statusesToUpdate.isNotEmpty()) {
+//            userStatusDao.updateStatuses(statusesToUpdate)
+//        }
+    }
 
     override suspend fun getUserStatusSummary(): Flow<UserStatusSummary> {
         return combine(
@@ -191,11 +222,11 @@ class StatusRepositoryImpl (
                     otherStatusDao.insertAll(entities)
                 }
                 is ResultWrapper.Failure -> {
-                    Log.e("StatusRepository", "Failed: ${result.exception}")
+                    //Log.e("StatusRepository", "Failed: ${result.exception}")
                 }
             }
         } catch (e: Exception) {
-            Log.e("StatusRepository", "Failed to fetch other users’ statuses", e)
+            //Log.e("StatusRepository", "Failed to fetch other users’ statuses", e)
         }
     }
 
@@ -301,7 +332,7 @@ class StatusRepositoryImpl (
         try {
             userStatusDao.getStatusById(id)?.let { status ->
                 status.localPath?.let { path ->
-                    deleteFileIfSafe(path)
+                    fileManager.deleteFileIfSafe(path)
                 }
                 if (status.serverId == null) {
                     userStatusDao.deleteStatus(id.toLong())
@@ -316,33 +347,27 @@ class StatusRepositoryImpl (
     }
 
     @OptIn(ExperimentalTime::class)
-    override suspend fun cleanExpiredStatuses(): Int {
+    override suspend fun cleanExpiredStatuses() {
         return withContext(dispatchers) {
             try {
-                val expiryTime = Clock.System.now().minus(24.hours).toEpochMilliseconds()
-                val countBefore = userStatusDao.getStatusCount()
-                userStatusDao.getExpiredStatusesWithPaths(expiryTime).forEachIndexed { index, status ->
-                    if (index % 10 == 0) delay(50) // Small pause every 10 files
-                    status.localPath?.let { deleteFileIfSafe(it) }
-                }
-                userStatusDao.deleteExpiredStatuses(expiryTime)
-                val countAfter = userStatusDao.getStatusCount()
-                countBefore - countAfter // Return number of deleted items
-            } catch (e: Exception) {
-                Log.e("StatusRepository", "Failed to clean expired statuses", e)
-                0
-            }
-        }
-    }
+                val currentTime = Clock.System.now().toEpochMilliseconds()
 
-    override suspend fun getStatusCount(): Int {
-        return withContext(dispatchers) {
-            try {
-                val count = userStatusDao.getStatusCount()
-                count
+                // Clean up UserStatusEntity
+                userStatusDao.getExpiredStatusesWithPaths(currentTime).forEachIndexed { index, status ->
+                    if (index % 10 == 0) delay(50) // Small pause every 10 files
+                    status.localPath?.let { fileManager.deleteFileIfSafe(it) }
+                }
+                userStatusDao.deleteExpiredStatuses(currentTime)
+
+                // Clean up OtherUserStatusEntity
+                otherStatusDao.getExpiredStatusesLocalPaths(currentTime).forEachIndexed { index, localPath ->
+                    if (index % 10 == 0) delay(50)
+                    localPath.let { fileManager.deleteFileIfSafe(it) }
+                }
+                otherStatusDao.deleteExpiredStatuses(currentTime)
+
             } catch (e: Exception) {
-                Log.e("StatusRepository", "Failed to count", e)
-                0
+                //Log.e("StatusRepository", "Failed to clean expired statuses", e)
             }
         }
     }
@@ -351,8 +376,12 @@ class StatusRepositoryImpl (
     override suspend fun getExpiredStatusCount(): Int {
         return withContext(dispatchers) {
             try {
-                val count = userStatusDao.getExpiredStatusCount(Clock.System.now().toEpochMilliseconds())
-                count
+                val currentTime = Clock.System.now().toEpochMilliseconds()
+                var count: Int
+                val userStatusCount = userStatusDao.getExpiredStatusCount(currentTime)
+                val otherStatusCount = otherStatusDao.getExpiredStatusCount(currentTime)
+
+                userStatusCount + otherStatusCount
             } catch (e: Exception) {
                 Log.e("StatusRepository", "Failed to count expired", e)
                 0
@@ -387,19 +416,6 @@ class StatusRepositoryImpl (
                 ?.let { ".$it" } ?: ""
         } catch (e: Exception) {
             ""
-        }
-    }
-
-    private fun deleteFileIfSafe(path: String) {
-        try {
-            val file = File(path)
-            if (file.exists() && file.canonicalPath.startsWith(appFilesDir)) {
-                if (!file.delete()) {
-                    Log.w("FileCleanup", "Failed to delete: ${file.name}")
-                }
-            }
-        } catch (e: SecurityException) {
-            Log.w("FileCleanup", "Security exception: ${File(path).name}")
         }
     }
 
