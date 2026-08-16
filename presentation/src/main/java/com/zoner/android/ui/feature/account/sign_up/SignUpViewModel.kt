@@ -77,6 +77,7 @@ class SignUpViewModel(
                             trackRegistrationStage == "EMAIL_SUBMITTED" -> RegistrationStage.EMAIL_SUBMITTED
                             trackRegistrationStage == "EMAIL_VERIFIED" -> RegistrationStage.EMAIL_VERIFIED
                             trackRegistrationStage == "PROFILE_COMPLETED" -> RegistrationStage.PROFILE_COMPLETED
+                            trackRegistrationStage == "BUSINESS_ADDED" -> RegistrationStage.BUSINESS_ADDED
                             else -> null
                         }
 
@@ -97,7 +98,8 @@ class SignUpViewModel(
                                 )
                                 _event.send(SignUpEvent.NavigateToCompleteProfile(result.value.data?.userId))
                             }
-                            RegistrationStage.PROFILE_COMPLETED -> {
+                            RegistrationStage.PROFILE_COMPLETED,
+                            RegistrationStage.BUSINESS_ADDED -> {
                                 _state.value = SignUpState.Success
                                 session.saveUserSession(
                                     userId = result.value.data?.userId,
@@ -168,6 +170,7 @@ class SignUpViewModel(
                             trackRegistrationStage == "EMAIL_SUBMITTED" -> RegistrationStage.EMAIL_SUBMITTED
                             trackRegistrationStage == "EMAIL_VERIFIED" -> RegistrationStage.EMAIL_VERIFIED
                             trackRegistrationStage == "PROFILE_COMPLETED" -> RegistrationStage.PROFILE_COMPLETED
+                            trackRegistrationStage == "BUSINESS_ADDED" -> RegistrationStage.BUSINESS_ADDED
                             else -> null
                         }
                         when (registrationStage) {
@@ -187,7 +190,8 @@ class SignUpViewModel(
                                 )
                                 _event.send(SignUpEvent.NavigateToCompleteProfile(result.value.data?.userId))
                             }
-                            RegistrationStage.PROFILE_COMPLETED -> {
+                            RegistrationStage.PROFILE_COMPLETED,
+                            RegistrationStage.BUSINESS_ADDED -> {
                                 _state.value = SignUpState.Success
                                 session.saveUserSession(
                                     userId = result.value.data?.userId,

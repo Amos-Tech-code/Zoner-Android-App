@@ -4,12 +4,21 @@ package com.zoner.domain.model
 enum class RegistrationStage {
     EMAIL_SUBMITTED,     // After signup, before verification
     EMAIL_VERIFIED,      // After verification, before profile
-    PROFILE_COMPLETED   // Username/profile set
+    PROFILE_COMPLETED,   // Username/profile set
+
+    BUSINESS_ADDED,       // Business profile added
 }
 
 enum class UserRole {
     USER,               // Default (can only view posts)
     BUSINESS           // Can post business content (verified or unverified)
+}
+
+
+enum class DevicePlatform {
+    ANDROID,
+    IOS,
+    WEB
 }
 
 enum class MediaType {

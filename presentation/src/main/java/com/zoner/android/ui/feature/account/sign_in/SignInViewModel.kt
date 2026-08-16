@@ -1,5 +1,6 @@
 package com.zoner.android.ui.feature.account.sign_in
 
+import android.util.Patterns
 import androidx.lifecycle.viewModelScope
 import com.zoner.android.ui.feature.account.BaseAuthViewModel
 import com.zoner.data.local.datastore.ZonerSession
@@ -7,6 +8,7 @@ import com.zoner.domain.ResultWrapper
 import com.zoner.domain.model.RegistrationStage
 import com.zoner.domain.model.UserRole
 import com.zoner.domain.model.request.LoginRequest
+import com.zoner.domain.model.request.LoginRequestV2
 import com.zoner.domain.repository.AccountRepository
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -54,8 +56,14 @@ class SignInViewModel(
             _state.value = SignInState.Loading
 
             try {
-                val result = repository.login(
-                    LoginRequest(email.value, password.value)
+                val result = repository.loginV2(
+                    LoginRequestV2(
+                        email = email.value,
+                        password = password.value,
+                        deviceId = session.getDeviceId(),
+                        deviceName = session.getDeviceName(),
+                        platform = session.getDevicePlatform(),
+                    )
                 )
 
                 when(result) {
@@ -64,7 +72,7 @@ class SignInViewModel(
                         _event.send(SignInEvent.ShowErrorDialog(result.exception.message ?: "An unknown error occurred. Please try again."))
                     }
                     is ResultWrapper.Success -> {
-                        val registrationStage = when {
+                        /*val registrationStage = when {
                             result.value.user.registrationStage == "EMAIL_SUBMITTED" -> RegistrationStage.EMAIL_SUBMITTED
                             result.value.user.registrationStage == "EMAIL_VERIFIED" -> RegistrationStage.EMAIL_VERIFIED
                             result.value.user.registrationStage == "PROFILE_COMPLETED" -> RegistrationStage.PROFILE_COMPLETED
@@ -88,6 +96,7 @@ class SignInViewModel(
                             stage = registrationStage
 
                         )
+                         */
                         _state.value = SignInState.Success
                         _event.send(SignInEvent.NavigateToHome)
                     }
@@ -185,7 +194,7 @@ class SignInViewModel(
         if (email.isBlank()) {
             return "Email cannot be empty"
         }
-        if (!android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
+        if (!Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
             return "Invalid email address"
         }
         if (password.isBlank()) {

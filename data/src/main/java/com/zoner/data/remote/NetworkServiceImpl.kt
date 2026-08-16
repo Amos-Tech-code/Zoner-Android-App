@@ -2,29 +2,31 @@ package com.zoner.data.remote
 
 import android.content.Context
 import android.net.Uri
+import com.zoner.data.dto.ApiErrorDto
 import com.zoner.data.dto.auth.CheckUserNameRequestDto
 import com.zoner.data.dto.auth.ForgotPasswordDto
 import com.zoner.data.dto.auth.OauthRequestDto
 import com.zoner.data.dto.auth.ResendOtpRequestDto
 import com.zoner.data.dto.auth.VerifyEmailRequestDto
-import com.zoner.data.dto.status.StatusUploadResponseDto
 import com.zoner.data.mappers.toDomain
 import com.zoner.data.mappers.toDto
 import com.zoner.data.utils.FileConversionResult
 import com.zoner.data.utils.extractErrorMessage
+import com.zoner.data.utils.getDefaultErrorMessage
 import com.zoner.data.utils.toMultipartBodyPart
 import com.zoner.data.utils.toPlainRequestBody
 import com.zoner.domain.ResultWrapper
 import com.zoner.domain.model.InteractionType
 import com.zoner.domain.model.SaveUserStatus
-import com.zoner.domain.model.StatusGroup
 import com.zoner.domain.model.request.CompleteProfileRequest
 import com.zoner.domain.model.request.CreateBusinessProfile
 import com.zoner.domain.model.request.LoginRequest
+import com.zoner.domain.model.request.LoginRequestV2
 import com.zoner.domain.model.request.RegisterRequest
 import com.zoner.domain.model.request.ResetPasswordRequest
 import com.zoner.domain.model.response.GenericResponse
 import com.zoner.domain.model.response.LoginResponse
+import com.zoner.domain.model.response.LoginResponseV2
 import com.zoner.domain.model.response.OtherUserStatusResponse
 import com.zoner.domain.model.response.RegisterResponse
 import com.zoner.domain.model.response.ResendOtpResponse
@@ -36,6 +38,7 @@ import com.zoner.domain.network.NetworkService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.Json
 import okhttp3.MultipartBody
 import retrofit2.HttpException
 import java.io.IOException
@@ -49,7 +52,8 @@ import kotlin.coroutines.cancellation.CancellationException
  * Remote network
  */
 class NetworkServiceImpl(
-    private val apiService: ApiService,
+    private val apiServiceV1: ApiService,
+    private val apiServiceV2: ApiServiceV2,
     private val connectivityObserver: ConnectivityObserver,
     private val appContext: Context
 ) : NetworkService {
@@ -115,11 +119,72 @@ class NetworkServiceImpl(
         }
     }
 
+    // Helper function for V2 API calls using ApiErrorDto
+    suspend fun <T> safeApiCallV2(
+        networkCall: suspend () -> T
+    ): ResultWrapper<T> {
+        return try {
+            val isConnected = connectivityObserver.isConnected.first()
+            if (!isConnected) {
+                return ResultWrapper.Failure(
+                    IOException("No internet connection. Please check your connection and try again.")
+                )
+            }
+
+            val result = withContext(Dispatchers.IO) { networkCall() }
+            ResultWrapper.Success(result)
+
+        } catch (e: HttpException) {
+            val statusCode = e.code()
+            val errorBody = e.response()?.errorBody()?.string()
+
+            val errorMessage = try {
+                if (!errorBody.isNullOrBlank()) {
+                    val apiError = Json { ignoreUnknownKeys = true }.decodeFromString<ApiErrorDto>(errorBody)
+                    apiError.message
+                } else {
+                    getDefaultErrorMessage(statusCode)
+                }
+            } catch (ex: Exception) {
+                extractErrorMessage(errorBody, statusCode)
+            }
+
+            ResultWrapper.Failure(IOException(errorMessage))
+
+        } catch (e: Exception) {
+            if (e is CancellationException) throw e
+
+            when (e) {
+                is UnknownHostException -> ResultWrapper.Failure(
+                    IOException("You're offline. Please check your internet connection and try again.")
+                )
+                is SocketTimeoutException -> ResultWrapper.Failure(
+                    IOException("The server is taking too long to respond. Please try again later.")
+                )
+                else -> ResultWrapper.Failure(
+                    IOException(e.localizedMessage ?: "Something went wrong. Please try again later.")
+                )
+            }
+        }
+    }
+
     val emptyResponseMessage = "Empty response from server. Please try again later."
 
     override suspend fun login(loginRequest: LoginRequest): ResultWrapper<LoginResponse> {
         return safeApiCall {
-            val response = apiService.login(loginRequest.toDto())
+            val response = apiServiceV1.login(loginRequest.toDto())
+            if (response.isSuccessful) {
+                val body = response.body() ?: throw IOException(emptyResponseMessage)
+                body.toDomain()
+            } else {
+                throw HttpException(response)
+            }
+        }
+    }
+
+    override suspend fun loginV2(loginRequest: LoginRequestV2): ResultWrapper<LoginResponseV2> {
+        return safeApiCallV2 {
+            val response = apiServiceV2.login(loginRequest.toDto())
             if (response.isSuccessful) {
                 val body = response.body() ?: throw IOException(emptyResponseMessage)
                 body.toDomain()
@@ -131,7 +196,7 @@ class NetworkServiceImpl(
 
     override suspend fun register(registerRequest: RegisterRequest): ResultWrapper<RegisterResponse> {
         return safeApiCall {
-            val response = apiService.register(registerRequest.toDto())
+            val response = apiServiceV1.register(registerRequest.toDto())
             if (response.isSuccessful) {
                 val body = response.body() ?: throw IOException(emptyResponseMessage)
                 body.toDomain()
@@ -146,7 +211,7 @@ class NetworkServiceImpl(
         otp: String
     ): ResultWrapper<RegisterResponse> {
         return safeApiCall {
-            val response = apiService.verifyEmail(VerifyEmailRequestDto(userId, otp))
+            val response = apiServiceV1.verifyEmail(VerifyEmailRequestDto(userId, otp))
             if (response.isSuccessful) {
                 val body = response.body() ?: throw IOException(emptyResponseMessage)
                 body.toDomain()
@@ -158,7 +223,7 @@ class NetworkServiceImpl(
 
     override suspend fun requestNewOTP(userId: String): ResultWrapper<ResendOtpResponse> {
         return safeApiCall {
-            val response = apiService.resendOtp(ResendOtpRequestDto(userId))
+            val response = apiServiceV1.resendOtp(ResendOtpRequestDto(userId))
             if (response.isSuccessful) {
                 val body = response.body() ?: throw IOException(emptyResponseMessage)
                 body.toDomain()
@@ -173,7 +238,7 @@ class NetworkServiceImpl(
         username: String
     ): ResultWrapper<UsernameAvailability> {
         return safeApiCall {
-            val response = apiService.checkUsernameAvailability(
+            val response = apiServiceV1.checkUsernameAvailability(
                 CheckUserNameRequestDto(
                     userId,
                     username
@@ -190,7 +255,7 @@ class NetworkServiceImpl(
 
     override suspend fun googleSignIn(token: String): ResultWrapper<LoginResponse> {
         return safeApiCall {
-            val response = apiService.oauthLogin(OauthRequestDto(
+            val response = apiServiceV1.oauthLogin(OauthRequestDto(
                 token = token, provider = "google"
             ))
             if (response.isSuccessful) {
@@ -204,7 +269,7 @@ class NetworkServiceImpl(
 
     override suspend fun googleSignUp(token: String): ResultWrapper<RegisterResponse> {
         return safeApiCall {
-            val response = apiService.oauthRegister(OauthRequestDto(
+            val response = apiServiceV1.oauthRegister(OauthRequestDto(
                 token = token, provider = "google"
             ))
             if (response.isSuccessful) {
@@ -218,7 +283,7 @@ class NetworkServiceImpl(
 
     override suspend fun forgotPassword(email: String): ResultWrapper<GenericResponse> {
         return safeApiCall {
-            val response = apiService.forgotPassword(ForgotPasswordDto(email))
+            val response = apiServiceV1.forgotPassword(ForgotPasswordDto(email))
             if (response.isSuccessful) {
                 val body = response.body() ?: throw IOException(emptyResponseMessage)
                 body.toDomain()
@@ -230,7 +295,7 @@ class NetworkServiceImpl(
 
     override suspend fun resetPassword(resetPasswordRequest: ResetPasswordRequest): ResultWrapper<GenericResponse> {
         return safeApiCall {
-            val response = apiService.resetPassword(resetPasswordRequest.toDto())
+            val response = apiServiceV1.resetPassword(resetPasswordRequest.toDto())
             if (response.isSuccessful) {
                 val body = response.body() ?: throw IOException(emptyResponseMessage)
                 body.toDomain()
@@ -242,7 +307,7 @@ class NetworkServiceImpl(
 
     override suspend fun newOTPForPasswordReset(email: String): ResultWrapper<GenericResponse> {
         return safeApiCall {
-            val response = apiService.newOtpForPasswordReset(ForgotPasswordDto(email))
+            val response = apiServiceV1.newOtpForPasswordReset(ForgotPasswordDto(email))
             if (response.isSuccessful) {
                 val body = response.body() ?: throw IOException(emptyResponseMessage)
                 body.toDomain()
@@ -265,7 +330,7 @@ class NetworkServiceImpl(
                 }
             }
 
-            val response = apiService.completeProfile(
+            val response = apiServiceV1.completeProfile(
                 userId = userIdBody,
                 username = usernameBody,
                 profilePic = profilePicPart
@@ -281,7 +346,7 @@ class NetworkServiceImpl(
 
     override suspend fun createBusinessProfile(businessProfile: CreateBusinessProfile): ResultWrapper<LoginResponse> {
         return safeApiCall {
-            val response = apiService.createBusinessProfile(businessProfile.toDto())
+            val response = apiServiceV1.createBusinessProfile(businessProfile.toDto())
             if (response.isSuccessful) {
                 val body = response.body() ?: throw IOException(emptyResponseMessage)
                 body.toDomain()
@@ -303,7 +368,7 @@ class NetworkServiceImpl(
                 is FileConversionResult.Error -> throw IOException(result.message)
             }
 
-            val response = apiService.uploadStatus(
+            val response = apiServiceV1.uploadStatus(
                 mediaType = mediaTypeBody,
                 durationMillis = durationBody,
                 caption = captionBody,
@@ -321,7 +386,7 @@ class NetworkServiceImpl(
 
     override suspend fun getUserStatuses():  ResultWrapper<List<StatusResponse>> {
         return safeApiCall {
-            val response = apiService.fetchUserStatus()
+            val response = apiServiceV1.fetchUserStatus()
 
             if (response.isSuccessful) {
                 val body = response.body() ?: throw IOException(emptyResponseMessage)
@@ -334,7 +399,7 @@ class NetworkServiceImpl(
 
     override suspend fun getOtherUsersStatuses(): ResultWrapper<OtherUserStatusResponse> {
         return safeApiCall {
-            val response = apiService.fetchOtherUserStatuses(null, null)
+            val response = apiServiceV1.fetchOtherUserStatuses(null, null)
             if (response.isSuccessful) {
                 val body = response.body() ?: throw IOException(emptyResponseMessage)
                 body.toDomain()
@@ -350,7 +415,7 @@ class NetworkServiceImpl(
 
     override suspend fun deleteStatus(statusId: String): ResultWrapper<GenericResponse> {
         return safeApiCall {
-            val response = apiService.deleteStatus(statusId)
+            val response = apiServiceV1.deleteStatus(statusId)
             if (response.isSuccessful) {
                 val body = response.body() ?: throw IOException(emptyResponseMessage)
                 body.toDomain()

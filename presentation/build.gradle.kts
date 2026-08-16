@@ -108,9 +108,9 @@ dependencies {
     //Lifecycle
     implementation(libs.androidx.lifecycle.runtime.compose)
     //Google
-    implementation("androidx.credentials:credentials:1.3.0")
-    implementation("androidx.credentials:credentials-play-services-auth:1.3.0")
-    implementation("com.google.android.libraries.identity.googleid:googleid:1.1.1")
+    implementation("androidx.credentials:credentials:1.6.0")
+    implementation("androidx.credentials:credentials-play-services-auth:1.6.0")
+    implementation("com.google.android.libraries.identity.googleid:googleid:1.2.0")
     //Foundation Permissions API
     implementation(libs.androidx.foundation)
     //Accompanist Permissions
@@ -128,6 +128,5 @@ dependencies {
     implementation("androidx.camera:camera-extensions:1.4.2")
     //WorkManager
     implementation(libs.androidx.work.runtime.ktx)
-
 
 }

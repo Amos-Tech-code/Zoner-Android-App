@@ -1,11 +1,14 @@
 package com.zoner.data.local.datastore
 
+import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import com.zoner.data.utils.DeviceUtil
+import com.zoner.domain.model.DevicePlatform
 import com.zoner.domain.model.LocalUser
 import com.zoner.domain.model.RegistrationStage
 import com.zoner.domain.model.UserRole
@@ -14,7 +17,10 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.map
 
-class ZonerSession(private val dataStore: DataStore<Preferences>) {
+class ZonerSession(
+    private val dataStore: DataStore<Preferences>,
+    private val deviceUtil: DeviceUtil
+) {
 
     object SessionKeys {
 
@@ -194,4 +200,10 @@ class ZonerSession(private val dataStore: DataStore<Preferences>) {
             // Onboarding is preserved
         }
     }
+
+    fun getDeviceId(): String = deviceUtil.getDeviceId()
+
+    fun getDeviceName(): String = deviceUtil.getDeviceName()
+
+    fun getDevicePlatform(): DevicePlatform = DevicePlatform.ANDROID
 }

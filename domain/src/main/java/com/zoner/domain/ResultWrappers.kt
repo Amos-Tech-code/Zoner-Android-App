@@ -9,14 +9,6 @@ sealed class ResultWrapper<out T> {
 
 }
 
-// Upload Status Wrapper
-//sealed class StatusState {
-//    data object Pending : StatusState()
-//    data object Uploading : StatusState()
-//
-//    data class Failed(val error: String) : StatusState()
-//    data object Uploaded : StatusState()
-//}
 
 sealed class StatusState {
     abstract val stateName: String
